@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -19,30 +18,22 @@ func IngestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// limit file size
 	r.Body = http.MaxBytesReader(w, r.Body, MAX_UPLOAD_SIZE)
+	file, header, err := r.FormFile("video")
 
-	file, fileHeader, err := r.FormFile("video")
-	if err != nil {
-		var errMaxBytes *http.MaxBytesError
-
-		if errors.Is(err, http.ErrMissingFile) {
-			utils.JsonResponse(w, 400, utils.Payload{ 
-				Success: false, 
-				Message: "File missing, 'video' is required",
-			})
-		} else if errors.As(err, &errMaxBytes) {
-			utils.JsonResponse(w, http.StatusRequestEntityTooLarge, utils.Payload{
-				Success: false,
-				Message: "File is too large. Maximum 5MB allowed.",
-			})
-		}
-
+	// check for errors
+	res, isValid := utils.ErrorType(err) 
+	if !isValid {
+		utils.JsonResponse(w, res.Code, utils.Payload{
+			Success: false,
+			Message: res.Message,
+		})
 		return
 	}
-
 	defer file.Close()
 
-	fmt.Printf("Received file: %s\n", fileHeader.Header)
+	fmt.Println(header.Filename)
 
 	utils.JsonResponse(w, 200, utils.Payload{
 		Success: true,
