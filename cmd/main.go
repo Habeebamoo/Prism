@@ -5,14 +5,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Habeebamoo/Prism/internal/handlers"
+	"github.com/Habeebamoo/Prism/internal/ingest"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 )
 
 func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/api/v1/ingest", handlers.IngestHandler)
+	mux.HandleFunc("/api/v1/ingest", ingest.IngestHandler)
 
 	handler := middlewares.CORS(mux)
 
