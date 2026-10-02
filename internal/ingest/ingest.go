@@ -1,9 +1,13 @@
 package ingest
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/Habeebamoo/Prism/pkg/utils"
+	"github.com/google/uuid"
 )
 
 var MAX_UPLOAD_SIZE int64 = 5 * 1024 * 1024 // 5MB
@@ -41,13 +45,27 @@ func IngestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	videoId := uuid.New().String()
+	rawFilePath := filepath.Join("./storage/raw", fmt.Sprintf("%s.mp4", videoId))
+
 	// stream file bytes to disk
-	if err := StreamFileToDisk(file); err != nil {
+	if err := StreamFileToDisk(file, rawFilePath); err != nil {
 		utils.JsonResponse(w, 500, utils.Payload{
 			Success: false,
 			Message: err.Error(),
 		})
 		return
+	}
+
+	// probe video
+	_, err = ProbeVideo(rawFilePath)
+	if err != nil {
+		os.Remove(rawFilePath)
+
+		utils.JsonResponse(w, 500, utils.Payload{
+			Success: false,
+			Message: err.Error(),
+		})
 	}
 
 	utils.JsonResponse(w, 200, utils.Payload{

@@ -1,15 +1,16 @@
 package ingest
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
-
-	"github.com/google/uuid"
+	"strconv"
 )
 
 type ErrorResponse struct {
@@ -60,10 +61,7 @@ func ValidateMimeType(file multipart.File) error {
 	return nil
 }
 
-func StreamFileToDisk(file multipart.File) error {
-	videoId := uuid.New().String()
-	rawFilePath := filepath.Join("./storage/raw", fmt.Sprintf("%s.mp4", videoId))
-
+func StreamFileToDisk(file multipart.File, rawFilePath string) error {
 	// create storage directory
 	if err := os.MkdirAll(filepath.Dir(rawFilePath), 0755); err != nil {
 		return fmt.Errorf("Failed to initialize storage directory: %v", err)
@@ -83,4 +81,45 @@ func StreamFileToDisk(file multipart.File) error {
 	}
 
 	return nil
+}
+
+func ProbeVideo(filePath string) (*VideoMetadata, error) {
+	cmd := exec.Command("ffprobe",
+				"-v", "quiet",
+				"-print_format", "json",
+				"-show_format",
+				"-show_streams",
+				"-select_streams", "v:0",
+				filePath,
+	)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("ffprobe execution failed: %v", err)
+	}
+
+	var probe FFProbeOutput
+	if err := json.Unmarshal(output, &probe); err != nil {
+		return  nil, fmt.Errorf("Failed to parse ffprobe output: %v", err)
+	}
+
+
+	if len(probe.Streams) == 0 {
+		return nil, fmt.Errorf("No video streams found in the file")
+	}
+
+	stream := probe.Streams[0]
+
+	if stream.Width <= 0 || stream.Height <= 0 {
+		return nil, fmt.Errorf("Invalid video dimensions")
+	}
+
+	duration, _ := strconv.ParseFloat(probe.Format.Duration, 64)
+	
+	return &VideoMetadata{
+		Width: stream.Width,
+		Height: stream.Height,
+		Duration: duration,
+		Codec: stream.CodecName,
+	}, nil
 }
