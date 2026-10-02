@@ -1,7 +1,6 @@
-package handlers
+package ingest
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/Habeebamoo/Prism/pkg/utils"
@@ -20,10 +19,10 @@ func IngestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// limit file size
 	r.Body = http.MaxBytesReader(w, r.Body, MAX_UPLOAD_SIZE)
-	file, header, err := r.FormFile("video")
+	file, _, err := r.FormFile("video")
 
 	// check for errors
-	res, isValid := utils.ErrorType(err) 
+	res, isValid := ErrorType(err) 
 	if !isValid {
 		utils.JsonResponse(w, res.Code, utils.Payload{
 			Success: false,
@@ -33,7 +32,23 @@ func IngestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	fmt.Println(header.Filename)
+	// validate mime type
+	if err := ValidateMimeType(file); err != nil {
+		utils.JsonResponse(w, 400, utils.Payload{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// stream file bytes to disk
+	if err := StreamFileToDisk(file); err != nil {
+		utils.JsonResponse(w, 500, utils.Payload{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
 
 	utils.JsonResponse(w, 200, utils.Payload{
 		Success: true,
