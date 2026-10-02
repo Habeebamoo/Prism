@@ -1,18 +1,30 @@
 package ingest
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/queue"
 	"github.com/Habeebamoo/Prism/pkg/utils"
 	"github.com/google/uuid"
 )
 
-var MAX_UPLOAD_SIZE int64 = 5 * 1024 * 1024 // 5MB
+type IngestHandler struct {
+	ctx       context.Context
+	cfg       *configs.Config
+  producer  *queue.Producer
+}
 
-func IngestHandler(w http.ResponseWriter, r *http.Request) {
+func NewIngestHandler(ctx context.Context, cfg *configs.Config, producer *queue.Producer) *IngestHandler {
+	return &IngestHandler{ctx, cfg, producer}
+}
+
+func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		utils.JsonResponse(w, http.StatusMethodNotAllowed, utils.Payload{
 			Success: false,
@@ -22,7 +34,7 @@ func IngestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// limit file size
-	r.Body = http.MaxBytesReader(w, r.Body, MAX_UPLOAD_SIZE)
+	r.Body = http.MaxBytesReader(w, r.Body, i.cfg.MaxUploadSize)
 	file, _, err := r.FormFile("video")
 
 	// check for errors
@@ -66,6 +78,23 @@ func IngestHandler(w http.ResponseWriter, r *http.Request) {
 			Success: false,
 			Message: err.Error(),
 		})
+		return
+	}
+
+
+	// publish to queue
+	outputDir := fmt.Sprintf("storage/processed/%s", videoId)
+	payload := queue.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }
+
+	err = i.producer.Publish(payload)
+	if err != nil {
+		log.Println(err.Error())
+
+		utils.JsonResponse(w, 500, utils.Payload{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
 	}
 
 	utils.JsonResponse(w, 200, utils.Payload{
