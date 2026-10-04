@@ -10,9 +10,12 @@ import (
 )
 
 type Config struct {
-	MaxUploadSize  int64
-	RedisUrl       string
-	StreamName     string
+	Port             string
+	MaxUploadSize    int64
+	RedisUrl         string
+	StreamName       string
+	WorkerGroupName  string
+	SemaphoreSize    int64
 }
 
 var Envs []string
@@ -24,12 +27,22 @@ func Load() *Config {
 		os.Exit(1)
 	}
 
+	port := "PORT"
 	maxUploadSizeStr := "MAX_UPLOAD_SIZE_BYTES"
 	redisUrl := "REDIS_URL"
 	streamName := "STREAM_NAME"
+	workerGroupName := "WORKER_GROUP_NAME"
+	semaphoreSizeStr := "SEMAPHORE_SIZE"
 
 	// validate env variables
-	Envs =  append(Envs, maxUploadSizeStr, redisUrl, streamName)
+	Envs =  append(Envs, 
+		maxUploadSizeStr, 
+		redisUrl, 
+		streamName, 
+		workerGroupName, 
+		port,
+		semaphoreSizeStr,
+	)
 	for _, env := range Envs {
 		if err := Check(env); err != nil {
 			log.Fatal(err)
@@ -37,12 +50,17 @@ func Load() *Config {
 		}
 	}
 
+	// conver string env -> int
 	maxUploadSize, _ := strconv.ParseInt(os.Getenv(maxUploadSizeStr), 10, 64)
+	semaphorSize, _ := strconv.ParseInt(os.Getenv(semaphoreSizeStr), 10, 64)
 
 	return &Config{
+		Port: os.Getenv(port),
 		MaxUploadSize: maxUploadSize,
 		RedisUrl: os.Getenv(redisUrl),
 		StreamName: os.Getenv(streamName),
+		WorkerGroupName: os.Getenv(workerGroupName),
+		SemaphoreSize: semaphorSize,
 	}
 }
 
