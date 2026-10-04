@@ -81,7 +81,6 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	// publish to queue
 	outputDir := fmt.Sprintf("storage/processed/%s", videoId)
 	payload := queue.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }
