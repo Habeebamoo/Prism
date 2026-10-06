@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -15,17 +16,11 @@ type Producer struct {
 	client *redis.Client
 }
 
-type TranscodeJob struct {
-	VideoId    string  `json:"video_id"`
-	RawPath    string  `json:"raw_path"`
-	OutputDir  string  `json:"output_dir"`
-}
-
 func NewProducer(cfg *configs.Config, client *redis.Client) *Producer {
 	return &Producer{cfg, client}
 }
 
-func (p *Producer) Publish(job TranscodeJob) error {
+func (p *Producer) Publish(job transcode.TranscodeJob) error {
 	payload, err := json.Marshal(job)
 	if err != nil {
 		return fmt.Errorf("Failed to convert payload to JSON")

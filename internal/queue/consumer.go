@@ -2,27 +2,29 @@ package queue
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"log"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/redis/go-redis/v9"
 )
 
 type Consumer struct {
-	cfg *configs.Config
-	client *redis.Client
-	sem chan struct{}
+	cfg         *configs.Config
+	client      *redis.Client
+	sem         chan struct{}
+	transcoder  *transcode.Transcoder
 }
 
-func NewConsumer(cfg *configs.Config, client *redis.Client) *Consumer {
+func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder) *Consumer {
 	return &Consumer{
 		cfg: cfg, 
 		client: client, 
 		sem: make(chan struct{}, cfg.SemaphoreSize),
+		transcoder: transcoder,
 	}
 }
 
@@ -48,7 +50,7 @@ func (c *Consumer) Start(ctx context.Context) {
 		default:
 			streams, err := c.client.XReadGroup(ctx, &redis.XReadGroupArgs{
 				Group: c.cfg.WorkerGroupName,
-				Consumer: fmt.Sprintf("worker-node-%d", os.Getpid()),
+				Consumer: "worker-node",
 				Streams: []string{c.cfg.StreamName, ">"},
 				Count: 10,
 				Block: 5*time.Second,
@@ -74,12 +76,34 @@ func (c *Consumer) Start(ctx context.Context) {
 						defer func() { <-c.sem } () // release slot when done
 						defer wg.Done()
 
-						// process
 						log.Printf("[WorkerPool] Picked up message %v\n", m.ID)
-						time.Sleep(30*time.Second)
+
+						// extract job
+						raw := m.Values["data"].(string)
+						var payload transcode.TranscodeJob
+
+						if json.Unmarshal([]byte(raw), &payload) != nil {
+							log.Println("[WorkerPool] Failed to extract job")
+						}
+
+						// transcode job
+						err := c.transcoder.Transcode(payload)
+						if err != nil {
+							log.Println("[WorkerPool] Failed to transcode job")
+						}
+
+						log.Println("[WorkerPool] Job Transcoded Successfully")
+
+						if c.Ack(ctx, m.ID) != nil {
+							log.Println("[WorkerPool] Failed to ack job")
+						}
 					}(msg)
 				}
 			}
 		}
 	}
+}
+
+func (c *Consumer) Ack(ctx context.Context, id string) error {
+	return c.client.XAck(ctx, c.cfg.StreamName, c.cfg.WorkerGroupName, id).Err()
 }
