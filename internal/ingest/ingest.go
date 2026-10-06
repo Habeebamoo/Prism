@@ -10,6 +10,7 @@ import (
 
 	"github.com/Habeebamoo/Prism/internal/configs"
 	"github.com/Habeebamoo/Prism/internal/queue"
+	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/Habeebamoo/Prism/pkg/utils"
 	"github.com/google/uuid"
 )
@@ -81,9 +82,17 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// publish to queue
-	outputDir := fmt.Sprintf("storage/processed/%s", videoId)
-	payload := queue.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }
+	fmt.Println("HIT")
+
+	// create output directory
+	outputDir := fmt.Sprintf("storage/processed/%s.mov", videoId)
+	err = os.MkdirAll(filepath.Dir(fmt.Sprintf("%s", outputDir)), 0755)
+	if err != nil {
+		log.Println(err)
+	}
+
+	// publish job to queue
+	payload := transcode.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }
 
 	err = i.producer.Publish(payload)
 	if err != nil {

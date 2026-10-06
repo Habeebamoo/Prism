@@ -14,6 +14,7 @@ import (
 	"github.com/Habeebamoo/Prism/internal/ingest"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
+	"github.com/Habeebamoo/Prism/internal/transcode"
 )
 
 func main() {
@@ -28,14 +29,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// init message broker
 	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
 	var consumerWg sync.WaitGroup
 
+	// init transcoder
+	transcoder := transcode.NewTranscoder()
+
+	// init message broker
 	producer := queue.NewProducer(cfg, rdb)
-	consumer := queue.NewConsumer(cfg, rdb)
+	consumer := queue.NewConsumer(cfg, rdb, transcoder)
 
 	// start transcode worker pools
 	consumerWg.Add(1)
