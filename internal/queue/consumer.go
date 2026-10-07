@@ -84,18 +84,24 @@ func (c *Consumer) Start(ctx context.Context) {
 
 						if json.Unmarshal([]byte(raw), &payload) != nil {
 							log.Println("[WorkerPool] Failed to extract job")
+							return
 						}
 
 						// transcode job
-						err := c.transcoder.Transcode(payload)
+						transcodeCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+						defer cancel()
+
+						err := c.transcoder.Transcode(transcodeCtx, payload)
 						if err != nil {
 							log.Println("[WorkerPool] Failed to transcode job")
+							return
 						}
 
 						log.Println("[WorkerPool] Job Transcoded Successfully")
 
 						if c.Ack(ctx, m.ID) != nil {
 							log.Println("[WorkerPool] Failed to ack job")
+							return
 						}
 					}(msg)
 				}

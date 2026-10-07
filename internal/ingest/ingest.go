@@ -85,11 +85,7 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("HIT")
 
 	// create output directory
-	outputDir := fmt.Sprintf("storage/processed/%s.mov", videoId)
-	err = os.MkdirAll(filepath.Dir(fmt.Sprintf("%s", outputDir)), 0755)
-	if err != nil {
-		log.Println(err)
-	}
+	outputDir := fmt.Sprintf("storage/processed/%s", videoId)
 
 	// publish job to queue
 	payload := transcode.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }
