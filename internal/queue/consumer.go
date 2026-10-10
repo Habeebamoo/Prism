@@ -93,7 +93,7 @@ func (c *Consumer) Start(ctx context.Context) {
 
 						err := c.transcoder.Transcode(transcodeCtx, payload)
 						if err != nil {
-							log.Println("[WorkerPool] Failed to transcode job")
+							log.Println(err.Error())
 							return
 						}
 
