@@ -6,9 +6,9 @@ import (
 )
 
 type Payload struct {
-	Success bool `json:"success"`
-	Message string `json:"message"`
-	Data string `json:"data,omitempty"`
+	Success  bool    `json:"success"`
+	Message  string  `json:"message"`
+	Data     string  `json:"data,omitempty"`
 }
 
 func JsonResponse(w http.ResponseWriter, statusCode int, payload Payload) {

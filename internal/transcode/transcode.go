@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 )
 
 type Transcoder struct {}
@@ -91,6 +92,11 @@ func (t *Transcoder) Transcode(ctx context.Context, job TranscodeJob) error {
 	)
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+
+	// Detach ffmpeg from parent terminal process
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

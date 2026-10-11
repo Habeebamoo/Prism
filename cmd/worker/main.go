@@ -1,0 +1,44 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/transcode"
+	"github.com/Habeebamoo/Prism/internal/worker"
+)
+
+func main() {
+	// init config
+	cfg := configs.Load()
+
+	// init redis
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	rdb, err := configs.NewRedisClient(ctx, cfg.RedisUrl)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// init transcoder & consumer
+	transcoder := transcode.NewTranscoder()
+	consumer := worker.NewConsumer(cfg, rdb, transcoder)
+
+	go consumer.Start(sigCtx)
+
+	<-sigCtx.Done()
+	log.Println("[Worker] Shutting down process")
+
+	consumer.Stop()
+	log.Println("[Worker] Worker shutdown complete")
+}

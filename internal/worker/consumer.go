@@ -1,4 +1,4 @@
-package queue
+package worker
 
 import (
 	"context"
@@ -16,6 +16,7 @@ type Consumer struct {
 	cfg         *configs.Config
 	client      *redis.Client
 	sem         chan struct{}
+	wg          sync.WaitGroup
 	transcoder  *transcode.Transcoder
 }
 
@@ -36,16 +37,9 @@ func (c *Consumer) Start(ctx context.Context) {
 	}
 	log.Println("[WorkerPool] Workers listening on stream...")
 
-	var wg sync.WaitGroup
-
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("[WorkerPool] Waiting for active transcoders to finish")
-
-			wg.Wait()
-
-			log.Println("[WorkerPool] All workers completed")
 			return
 		default:
 			streams, err := c.client.XReadGroup(ctx, &redis.XReadGroupArgs{
@@ -70,11 +64,11 @@ func (c *Consumer) Start(ctx context.Context) {
 			for _, stream := range streams {
 				for _, msg := range stream.Messages {
 					c.sem <- struct{}{} // occupy slot
-					wg.Add(1)
+					c.wg.Add(1)
 
 					go func(m redis.XMessage) {
 						defer func() { <-c.sem } () // release slot when done
-						defer wg.Done()
+						defer c.wg.Done()
 
 						log.Printf("[WorkerPool] Picked up message %v\n", m.ID)
 
@@ -99,7 +93,11 @@ func (c *Consumer) Start(ctx context.Context) {
 
 						log.Println("[WorkerPool] Job Transcoded Successfully")
 
-						if c.Ack(ctx, m.ID) != nil {
+						// ack job
+						ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+
+						if c.Ack(ackCtx, m.ID) != nil {
 							log.Println("[WorkerPool] Failed to ack job")
 							return
 						}
@@ -112,4 +110,9 @@ func (c *Consumer) Start(ctx context.Context) {
 
 func (c *Consumer) Ack(ctx context.Context, id string) error {
 	return c.client.XAck(ctx, c.cfg.StreamName, c.cfg.WorkerGroupName, id).Err()
+}
+
+func (c *Consumer) Stop() {
+	log.Println("[WorkerPool] Waiting for active transcoders to finish")
+	c.wg.Wait()
 }

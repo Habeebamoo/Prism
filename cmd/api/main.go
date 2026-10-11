@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/Habeebamoo/Prism/internal/ingest"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
-	"github.com/Habeebamoo/Prism/internal/transcode"
 )
 
 func main() {
@@ -29,24 +27,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	sigCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
-
-	var consumerWg sync.WaitGroup
-
-	// init transcoder
-	transcoder := transcode.NewTranscoder()
-
 	// init message broker
 	producer := queue.NewProducer(cfg, rdb)
-	consumer := queue.NewConsumer(cfg, rdb, transcoder)
-
-	// start transcode worker pools
-	consumerWg.Add(1)
-	go func() {
-		defer consumerWg.Done()
-		consumer.Start(sigCtx)
-	}()
 
 	// init handler
 	ingestHandler := ingest.NewIngestHandler(ctx, cfg, producer)
@@ -55,8 +37,8 @@ func main() {
 	processedDir := "./storage/processed"
 	fileServer := http.FileServer(http.Dir(processedDir))
 
+	// routes
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
 	mux.Handle("GET /api/v1/stream/", http.StripPrefix("/api/v1/stream/", fileServer))
 
@@ -74,9 +56,10 @@ func main() {
 		}
 	}()
 
-	// block
-	<-sigCtx.Done()
-	consumerWg.Wait()
+	// graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
 
 	log.Println("Shutting down server")
 
