@@ -51,8 +51,14 @@ func main() {
 	// init handler
 	ingestHandler := ingest.NewIngestHandler(ctx, cfg, producer)
 
+	// init file server
+	processedDir := "./storage/processed"
+	fileServer := http.FileServer(http.Dir(processedDir))
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/ingest", ingestHandler.Ingest)
+
+	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
+	mux.Handle("GET /api/v1/stream/", http.StripPrefix("/api/v1/stream/", fileServer))
 
 	handler := middlewares.CORS(mux)
 

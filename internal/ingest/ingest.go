@@ -26,14 +26,6 @@ func NewIngestHandler(ctx context.Context, cfg *configs.Config, producer *queue.
 }
 
 func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		utils.JsonResponse(w, http.StatusMethodNotAllowed, utils.Payload{
-			Success: false,
-			Message: "Method not allowed",
-		})
-		return
-	}
-
 	// limit file size
 	r.Body = http.MaxBytesReader(w, r.Body, i.cfg.MaxUploadSize)
 	file, _, err := r.FormFile("video")
