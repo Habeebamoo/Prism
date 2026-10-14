@@ -37,8 +37,9 @@ func main() {
 	processedDir := "./storage/processed"
 	fileServer := http.FileServer(http.Dir(processedDir))
 
-	// routes
 	mux := http.NewServeMux()
+
+	// routes
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
 	mux.Handle("GET /api/v1/stream/", http.StripPrefix("/api/v1/stream/", fileServer))
 

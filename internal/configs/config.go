@@ -23,8 +23,7 @@ var Envs []string
 func Load() *Config {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+	 	log.Println("No .env file found. Using system env")
 	}
 
 	port := "PORT"
@@ -67,7 +66,7 @@ func Load() *Config {
 func Check(envName string) error {
 	env := os.Getenv(envName)
 	if env == "" {
-		return fmt.Errorf(fmt.Sprintf("%v is missing", envName))
+		return fmt.Errorf("%v is missing", envName)
 	}
 
 	return nil
