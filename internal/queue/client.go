@@ -1,4 +1,4 @@
-package configs
+package queue
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func NewRedisClient(ctx context.Context, url string) (*redis.Client, error) {
 
 	// ping redis server
 	if client.Ping(ctx).Err() != nil {
-		return nil, fmt.Errorf("couldn't connect to redis")
+		return nil, fmt.Errorf("failed to ping redis")
 	}
 
 	log.Println("Redis Connected")

@@ -21,7 +21,7 @@ func main() {
 
 	// init redis
 	cfg := configs.Load()
-	rdb, err := configs.NewRedisClient(ctx, cfg.RedisUrl)
+	rdb, err := queue.NewRedisClient(ctx, cfg.RedisUrl)
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
@@ -41,7 +41,7 @@ func main() {
 
 	// routes
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
-	mux.Handle("GET /api/v1/stream", http.StripPrefix("/api/v1/stream/", fileServer))
+	mux.Handle("GET /api/v1/stream/", http.StripPrefix("/api/v1/stream/", fileServer))
 
 	handler := middlewares.CORS(mux)
 

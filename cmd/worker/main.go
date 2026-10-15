@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/queue"
 	"github.com/Habeebamoo/Prism/internal/storage"
 	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/Habeebamoo/Prism/internal/worker"
@@ -22,7 +23,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	rdb, err := configs.NewRedisClient(ctx, cfg.RedisUrl)
+	rdb, err := queue.NewRedisClient(ctx, cfg.RedisUrl)
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
