@@ -96,7 +96,7 @@ func (c *Consumer) Start(ctx context.Context) {
 							return
 						}
 
-						log.Println("[WorkerPool] Job Transcoded Successfully")
+						log.Printf("[WorkerPool] Job Transcoded Successfully: (%s)\n", payload.VideoId)
 
 						// upload transcoded files to r2 bucket
 						// remotePrefix := fmt.Sprintf("videos/%s", payload.VideoId)

@@ -1,7 +1,6 @@
 package ingest
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,13 +15,12 @@ import (
 )
 
 type IngestHandler struct {
-	ctx       context.Context
 	cfg       *configs.Config
   producer  *queue.Producer
 }
 
-func NewIngestHandler(ctx context.Context, cfg *configs.Config, producer *queue.Producer) *IngestHandler {
-	return &IngestHandler{ctx, cfg, producer}
+func NewIngestHandler(cfg *configs.Config, producer *queue.Producer) *IngestHandler {
+	return &IngestHandler{cfg, producer}
 }
 
 func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {

@@ -31,7 +31,7 @@ func main() {
 	producer := queue.NewProducer(cfg, rdb)
 
 	// init handler
-	ingestHandler := ingest.NewIngestHandler(ctx, cfg, producer)
+	ingestHandler := ingest.NewIngestHandler(cfg, producer)
 
 	// init file server
 	processedDir := "./storage/processed"
@@ -41,7 +41,7 @@ func main() {
 
 	// routes
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
-	mux.Handle("GET /api/v1/stream/", http.StripPrefix("/api/v1/stream/", fileServer))
+	mux.Handle("GET /api/v1/stream", http.StripPrefix("/api/v1/stream/", fileServer))
 
 	handler := middlewares.CORS(mux)
 
@@ -51,7 +51,7 @@ func main() {
 	}
 
 	go func() {
-		log.Println("Ingestion API is running on port 8080")
+		log.Printf("Ingest API running on port: %s\n", cfg.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Println("Server failed")
 		}
@@ -68,7 +68,8 @@ func main() {
 	defer cancel()
 
 	if err := server.Shutdown(shutDownCtx); err != nil {
-		log.Println("Failed to shut down server")
+		log.Println("Failed to shutdown server")
+		return
 	}
 
 	log.Println("Server exited cleanly")

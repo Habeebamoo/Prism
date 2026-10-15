@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	// init config
+	// init env configs
 	cfg := configs.Load()
 
 	// init redis
@@ -34,7 +34,8 @@ func main() {
 	// init storage
 	r2Storage, err := storage.NewR2Storage(ctx, cfg)
 	if err != nil {
-		log.Println("[Worker] Failed to initialize cloudflare r2")
+		log.Println("[Worker] Failed to initialize storage bucket")
+		os.Exit(1)
 	}
 
 	// init transcoder workerpool
@@ -44,8 +45,8 @@ func main() {
 	go consumer.Start(sigCtx)
 
 	<-sigCtx.Done()
-	log.Println("[Worker] Shutting down process")
+	log.Println("[Worker] Shutting down process.")
 
 	consumer.Stop()
-	log.Println("[Worker] Worker shutdown complete")
+	log.Println("[Worker] Shutdown complete.")
 }
