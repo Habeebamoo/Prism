@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/storage"
 	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/Habeebamoo/Prism/internal/worker"
 )
@@ -30,9 +31,15 @@ func main() {
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// init transcoder & consumer
+	// init storage
+	r2Storage, err := storage.NewR2Storage(ctx, cfg)
+	if err != nil {
+		log.Println("[Worker] Failed to initialize cloudflare r2")
+	}
+
+	// init transcoder workerpool
 	transcoder := transcode.NewTranscoder()
-	consumer := worker.NewConsumer(cfg, rdb, transcoder)
+	consumer := worker.NewConsumer(cfg, rdb, transcoder, r2Storage)
 
 	go consumer.Start(sigCtx)
 

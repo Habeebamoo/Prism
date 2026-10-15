@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/storage"
 	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/redis/go-redis/v9"
 )
@@ -18,14 +19,16 @@ type Consumer struct {
 	sem         chan struct{}
 	wg          sync.WaitGroup
 	transcoder  *transcode.Transcoder
+	r2Storage   *storage.R2Storage
 }
 
-func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder) *Consumer {
+func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder, r2Storage *storage.R2Storage) *Consumer {
 	return &Consumer{
 		cfg: cfg, 
 		client: client, 
 		sem: make(chan struct{}, cfg.SemaphoreSize),
 		transcoder: transcoder,
+		r2Storage: r2Storage,
 	}
 }
 
@@ -70,8 +73,6 @@ func (c *Consumer) Start(ctx context.Context) {
 						defer func() { <-c.sem } () // release slot when done
 						defer c.wg.Done()
 
-						log.Printf("[WorkerPool] Picked up message %v\n", m.ID)
-
 						// extract job
 						raw := m.Values["data"].(string)
 						var payload transcode.TranscodeJob
@@ -81,9 +82,13 @@ func (c *Consumer) Start(ctx context.Context) {
 							return
 						}
 
+						log.Printf("[WorkerPool] Picked up video: (%s)\n", payload.VideoId)
+
 						// transcode job
 						transcodeCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 						defer cancel()
+
+						log.Printf("[WorkerPool] Starting transcode for video: (%s)\n", payload.VideoId)
 
 						err := c.transcoder.Transcode(transcodeCtx, payload)
 						if err != nil {
@@ -92,6 +97,19 @@ func (c *Consumer) Start(ctx context.Context) {
 						}
 
 						log.Println("[WorkerPool] Job Transcoded Successfully")
+
+						// upload transcoded files to r2 bucket
+						// remotePrefix := fmt.Sprintf("videos/%s", payload.VideoId)
+						// log.Println("[WorkerPool] Uploading assets to Cloudflare R2")
+
+						// if err := c.r2Storage.UploadDirectory(ctx, payload.RawPath, remotePrefix); err != nil {
+						// 	log.Printf("[WorkerPool] R2 upload failed for video: %s | err: %v\n", payload.VideoId, err)
+						// 	return
+						// }
+
+						// // clean up local disk
+						// os.RemoveAll(payload.OutputDir)
+						// os.RemoveAll(payload.RawPath)
 
 						// ack job
 						ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
