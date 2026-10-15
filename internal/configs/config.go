@@ -10,12 +10,16 @@ import (
 )
 
 type Config struct {
-	Port             string
-	MaxUploadSize    int64
-	RedisUrl         string
-	StreamName       string
-	WorkerGroupName  string
-	SemaphoreSize    int64
+	Port               string
+	MaxUploadSize      int64
+	RedisUrl           string
+	StreamName         string
+	WorkerGroupName    string
+	SemaphoreSize      int64
+	R2AccountId        string
+	R2AccessKeyId      string
+	R2SecretAccessKey  string
+	R2BucketName       string
 }
 
 var Envs []string
@@ -32,6 +36,10 @@ func Load() *Config {
 	streamName := "STREAM_NAME"
 	workerGroupName := "WORKER_GROUP_NAME"
 	semaphoreSizeStr := "SEMAPHORE_SIZE"
+	r2AccountId := "R2_ACCOUNT_ID"
+	r2AccessKeyId := "R2_ACCESS_KEY_ID"
+	r2SecretAccessKey := "R2_SECRET_ACCESS_KEY"
+	r2BucketName := "R2_BUCKET_NAME"
 
 	// validate env variables
 	Envs =  append(Envs, 
@@ -41,6 +49,10 @@ func Load() *Config {
 		workerGroupName, 
 		port,
 		semaphoreSizeStr,
+		r2AccountId,
+		r2AccessKeyId,
+		r2SecretAccessKey,
+		r2BucketName,
 	)
 	for _, env := range Envs {
 		if err := Check(env); err != nil {
@@ -54,12 +66,16 @@ func Load() *Config {
 	semaphorSize, _ := strconv.ParseInt(os.Getenv(semaphoreSizeStr), 10, 64)
 
 	return &Config{
-		Port: os.Getenv(port),
-		MaxUploadSize: maxUploadSize,
-		RedisUrl: os.Getenv(redisUrl),
-		StreamName: os.Getenv(streamName),
-		WorkerGroupName: os.Getenv(workerGroupName),
-		SemaphoreSize: semaphorSize,
+		Port:               os.Getenv(port),
+		MaxUploadSize:      maxUploadSize,
+		RedisUrl:           os.Getenv(redisUrl),
+		StreamName:         os.Getenv(streamName),
+		WorkerGroupName:    os.Getenv(workerGroupName),
+		SemaphoreSize:      semaphorSize,
+		R2AccountId:        os.Getenv(r2AccountId),
+		R2AccessKeyId:      os.Getenv(r2AccessKeyId),
+		R2SecretAccessKey:  os.Getenv(r2SecretAccessKey),
+		R2BucketName:       os.Getenv(r2BucketName),
 	}
 }
 
