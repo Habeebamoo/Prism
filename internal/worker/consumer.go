@@ -3,7 +3,9 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -19,16 +21,16 @@ type Consumer struct {
 	sem         chan struct{}
 	wg          sync.WaitGroup
 	transcoder  *transcode.Transcoder
-	r2Storage   *storage.R2Storage
+	storage     *storage.B2Client
 }
 
-func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder, r2Storage *storage.R2Storage) *Consumer {
+func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder, storage *storage.B2Client) *Consumer {
 	return &Consumer{
 		cfg: cfg, 
 		client: client, 
 		sem: make(chan struct{}, cfg.SemaphoreSize),
 		transcoder: transcoder,
-		r2Storage: r2Storage,
+		storage: storage,
 	}
 }
 
@@ -99,17 +101,21 @@ func (c *Consumer) Start(ctx context.Context) {
 						log.Printf("[WorkerPool] Job Transcoded Successfully: (%s)\n", payload.VideoId)
 
 						// upload transcoded files to r2 bucket
-						// remotePrefix := fmt.Sprintf("videos/%s", payload.VideoId)
-						// log.Println("[WorkerPool] Uploading assets to Cloudflare R2")
+						remotePrefix := fmt.Sprintf("videos/%s", payload.VideoId)
+						log.Println("[WorkerPool] Uploading assets to B2")
 
-						// if err := c.r2Storage.UploadDirectory(ctx, payload.RawPath, remotePrefix); err != nil {
-						// 	log.Printf("[WorkerPool] R2 upload failed for video: %s | err: %v\n", payload.VideoId, err)
-						// 	return
-						// }
+						if err := c.storage.UploadDirectory(ctx, payload.OutputDir, remotePrefix); err != nil {
+							log.Printf("[WorkerPool] B2 upload failed for video: %s | err: %v\n", payload.VideoId, err)
+							return
+						}
 
-						// // clean up local disk
-						// os.RemoveAll(payload.OutputDir)
-						// os.RemoveAll(payload.RawPath)
+						log.Printf("[WorkerPool] B2 upload finished for video %s\n", payload.VideoId)
+
+						// clean up local disk
+						log.Println("[WorkerPool] Cleaning up local workspace...")
+
+						os.RemoveAll(payload.OutputDir)
+						os.RemoveAll(payload.RawPath)
 
 						// ack job
 						ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

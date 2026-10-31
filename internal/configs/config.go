@@ -16,10 +16,12 @@ type Config struct {
 	StreamName         string
 	WorkerGroupName    string
 	SemaphoreSize      int64
-	R2AccountId        string
-	R2AccessKeyId      string
-	R2SecretAccessKey  string
-	R2BucketName       string
+	B2Endpoint         string
+	B2AccountId        string
+	B2AccessKeyId      string
+	B2SecretAccessKey  string
+	B2BucketName       string
+	B2Region           string
 }
 
 var Envs []string
@@ -30,16 +32,17 @@ func Load() *Config {
 	 	log.Println("No .env file found. Using system env")
 	}
 
-	port := "PORT"
-	maxUploadSizeStr := "MAX_UPLOAD_SIZE_BYTES"
-	redisUrl := "REDIS_URL"
-	streamName := "STREAM_NAME"
-	workerGroupName := "WORKER_GROUP_NAME"
-	semaphoreSizeStr := "SEMAPHORE_SIZE"
-	r2AccountId := "R2_ACCOUNT_ID"
-	r2AccessKeyId := "R2_ACCESS_KEY_ID"
-	r2SecretAccessKey := "R2_SECRET_ACCESS_KEY"
-	r2BucketName := "R2_BUCKET_NAME"
+	port               :=  "PORT"
+	maxUploadSizeStr   :=  "MAX_UPLOAD_SIZE_BYTES"
+	redisUrl           :=  "REDIS_URL"
+	streamName         :=  "STREAM_NAME"
+	workerGroupName    :=  "WORKER_GROUP_NAME"
+	semaphoreSizeStr   :=  "SEMAPHORE_SIZE"
+	b2Endpoint         :=  "B2_ENDPOINT"
+	b2AccessKeyId      :=  "B2_ACCESS_KEY_ID"
+	b2SecretAccessKey  :=  "B2_SECRET_ACCESS_KEY"
+	b2BucketName       :=  "B2_BUCKET_NAME"
+	b2Region           :=  "B2_REGION"
 
 	// validate env variables
 	Envs =  append(Envs, 
@@ -49,10 +52,11 @@ func Load() *Config {
 		workerGroupName, 
 		port,
 		semaphoreSizeStr,
-		r2AccountId,
-		r2AccessKeyId,
-		r2SecretAccessKey,
-		r2BucketName,
+		b2Endpoint,
+		b2AccessKeyId,
+		b2SecretAccessKey,
+		b2BucketName,
+		b2Region,
 	)
 	for _, env := range Envs {
 		if err := Check(env); err != nil {
@@ -72,10 +76,11 @@ func Load() *Config {
 		StreamName:         os.Getenv(streamName),
 		WorkerGroupName:    os.Getenv(workerGroupName),
 		SemaphoreSize:      semaphorSize,
-		R2AccountId:        os.Getenv(r2AccountId),
-		R2AccessKeyId:      os.Getenv(r2AccessKeyId),
-		R2SecretAccessKey:  os.Getenv(r2SecretAccessKey),
-		R2BucketName:       os.Getenv(r2BucketName),
+		B2Endpoint:         os.Getenv(b2Endpoint),
+		B2AccessKeyId:      os.Getenv(b2AccessKeyId),
+		B2SecretAccessKey:  os.Getenv(b2SecretAccessKey),
+		B2BucketName:       os.Getenv(b2BucketName),
+		B2Region:           os.Getenv(b2Region),
 	}
 }
 

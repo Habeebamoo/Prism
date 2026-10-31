@@ -32,16 +32,16 @@ func main() {
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// init storage
-	r2Storage, err := storage.NewR2Storage(ctx, cfg)
+	// init storage bucket
+	storage, err := storage.NewB2Client(cfg, ctx)
 	if err != nil {
-		log.Println("[Worker] Failed to initialize storage bucket")
+		log.Fatal("Failed to initialize storage bucket: ", err)
 		os.Exit(1)
 	}
 
 	// init transcoder workerpool
 	transcoder := transcode.NewTranscoder()
-	consumer := worker.NewConsumer(cfg, rdb, transcoder, r2Storage)
+	consumer := worker.NewConsumer(cfg, rdb, transcoder, storage)
 
 	go consumer.Start(sigCtx)
 
