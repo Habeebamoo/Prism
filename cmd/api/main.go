@@ -13,7 +13,6 @@ import (
 	"github.com/Habeebamoo/Prism/internal/ingest"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
-	"github.com/Habeebamoo/Prism/internal/storage"
 )
 
 func main() {
@@ -25,13 +24,6 @@ func main() {
 	rdb, err := queue.NewRedisClient(ctx, cfg.RedisUrl)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
-	}
-
-	// init storage bucket
-	storage, err := storage.NewB2Client(cfg, ctx)
-	if err != nil {
-		log.Fatal("Failed to initialize storage bucket: ", err)
 		os.Exit(1)
 	}
 
