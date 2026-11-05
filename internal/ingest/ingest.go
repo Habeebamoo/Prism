@@ -94,5 +94,8 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	utils.JsonResponse(w, 200, utils.Payload{
 		Success: true,
 		Message: "File received successfully",
+		Data: map[string]string{
+			"videoId": videoId,
+		},
 	})
 }
