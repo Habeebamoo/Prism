@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"mime"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/pkg/utils"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -82,7 +81,7 @@ func (b *B2Client) UploadDirectory(ctx context.Context, localDir, remotePrefix s
 				Key:           aws.String(key),
 				Body:          file,
 				ContentLength: aws.Int64(info.Size()),
-				ContentType:   aws.String(getContentType(path)),
+				ContentType:   aws.String(utils.GetContentType(path)),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to upload %s to B2: %w", key, err)
@@ -93,18 +92,10 @@ func (b *B2Client) UploadDirectory(ctx context.Context, localDir, remotePrefix s
 	})
 }
 
-func getContentType(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".m3u8":
-		return "application/x-mpegURL"
-	case ".ts":
-		return "video/MP2T"
-	default:
-		if t := mime.TypeByExtension(ext); t != "" {
-			return t
-		}
-		return "application/octet-stream"
-	}
+func (b *B2Client) GetObject(ctx context.Context, key string) (*s3.GetObjectOutput, error) {
+	return b.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(b.bucket),
+		Key: aws.String(key),
+	})
 }
 

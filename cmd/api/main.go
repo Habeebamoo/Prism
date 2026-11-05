@@ -13,6 +13,8 @@ import (
 	"github.com/Habeebamoo/Prism/internal/ingest"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
+	"github.com/Habeebamoo/Prism/internal/storage"
+	"github.com/Habeebamoo/Prism/internal/stream"
 )
 
 func main() {
@@ -30,18 +32,22 @@ func main() {
 	// init message broker
 	producer := queue.NewProducer(cfg, rdb)
 
-	// init handler
+	// inint b2 client
+	storageClient, err := storage.NewB2Client(cfg, ctx)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	// init handlers
 	ingestHandler := ingest.NewIngestHandler(cfg, producer)
+	streamHandler := stream.NewStreamHandler(cfg, storageClient)
 
-	// init file server
-	processedDir := "./storage/processed"
-	fileServer := http.FileServer(http.Dir(processedDir))
-
-	mux := http.NewServeMux()
 
 	// routes
+	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
-	mux.Handle("GET /api/v1/stream/", http.StripPrefix("/api/v1/stream/", fileServer))
+	mux.HandleFunc("GET /api/v1/stream/{videoId}/{filepath...}", streamHandler.ServeHTTP)
 
 	handler := middlewares.CORS(mux)
 
