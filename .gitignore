@@ -3,3 +3,6 @@ index.html
 .env
 api
 worker
+web/node_modules/
+web/.next/
+web/.env
