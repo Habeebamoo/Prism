@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@font-face {
+  font-family: "inter";
+  src: url("../src/fonts/Inter_18pt-Medium.ttf");
+};
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@font-face {
+  font-family: "outfit";
+  src: url("../src/fonts/Outfit-Regular.ttf");
+};
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+@font-face {
+  font-family: "jsans";
+  src: url("../src/fonts/PlusJakartaSans-Medium.ttf");
+};
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+@font-face {
+  font-family: "jsans-small";
+  src: url("../src/fonts/PlusJakartaSans-Light.ttf");
+};
+
+@theme {
+  --color-dark: #09090B;
+  --color-orange: #F97316;
+  --color-pink: #FF33B5;
+  --font-inter: "inter";
+  --font-outfit: "outfit";
+  --font-jsans: "jsans";
+  --font-jsans-small: "jsans-small";
+};
