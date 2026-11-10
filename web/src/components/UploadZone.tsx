@@ -91,7 +91,6 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
         if (xhr.status === 200 || xhr.status === 201) {
           try {
             const response = JSON.parse(xhr.responseText);
-            console.log(response)
             const generatedId = response.data.videoId;
 
             if (generatedId) {
@@ -99,7 +98,7 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
               setUploadState('success');
               onUploadSuccess(generatedId);
             } else {
-              setUploadError('Server responded, but video_id was missing.');
+              setUploadError('Server responded, but videoId was missing.');
               setUploadState('error');
             }
           } catch {
@@ -113,7 +112,7 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
       };
 
       xhr.onerror = () => {
-        setUploadError('Network error during upload. Ensure the Go server is running.');
+        setUploadError('Network error during upload.');
         setUploadState('error');
       };
 
@@ -129,9 +128,11 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
     if (xhrRef.current && uploadState === 'uploading') {
       xhrRef.current.abort();
     }
+
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+
     setSelectedFile(null);
     setPreviewUrl(null);
     setUploadState('idle');
@@ -205,7 +206,7 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
               <p className="text-base font-outfit font-bold text-white">
                 Drop video file here or <span className="text-pink underline decoration-pink/40 underline-offset-4">browse</span>
               </p>
-              <p className="text-xs font-jsans-small text-zinc-400 mt-1">Supports MP4, MOV, or MKV up to 2GB</p>
+              <p className="text-xs font-jsans-small text-zinc-400 mt-1">Supports MP4, MOV, or MKV up to 20MB</p>
             </div>
 
             <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-pink hover:opacity-90 text-white text-xs font-outfit font-bold shadow-[0_0_20px_rgba(255,51,181,0.4)] transition-all">
