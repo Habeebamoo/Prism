@@ -38,7 +38,6 @@ const HlsPlayer = ({ src, poster, autoPlay = true }: HlsPlayerProps) => {
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (autoPlay) {
           video.play().catch(() => {
-            // Auto-play was prevented by browser policy (user interaction required)
             setIsPlaying(false);
           });
         }
@@ -131,7 +130,7 @@ const HlsPlayer = ({ src, poster, autoPlay = true }: HlsPlayerProps) => {
       />
 
       {/* OVERLAY CONTROLS BAR */}
-      <div className="absolute bottom-0 inset-x-0 z-10 bg-gradient-to-t from-brand-black/95 via-brand-black/60 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-between">
+      <div className="absolute bottom-0 inset-x-0 z-10 bg-linear-to-t from-brand-black/95 via-brand-black/60 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           {/* PLAY / PAUSE BUTTON */}
           <button

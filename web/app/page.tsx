@@ -28,14 +28,16 @@ export default function LandingPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL;
-  const activeStreamUrl = activeVideoId ? `${API_BASE}/api/v1/videos/${activeVideoId}/master.m3u8` : '';
-  const activeShareUrl = activeVideoId ? `${typeof window !== 'undefined' ? window.location.origin : ''}/v/${activeVideoId}` : '';
+  const streamBase = (process.env.NEXT_PUBLIC_STREAM_URL!).replace(/\/$/, '');
+  const siteBase = (process.env.NEXT_PUBLIC_BASE_URL!).replace(/\/$/, '');
+
+  const activeStreamUrl = activeVideoId ? `${streamBase}/${activeVideoId}/master.m3u8` : '';
+  const activeShareUrl = activeVideoId ? `${siteBase}/v/${activeVideoId}` : '';
 
   const copyLink = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    const shareUrl = `${window.location.origin}/v/${id}`;
+    const shareUrl = `${siteBase}/v/${id}`;
     navigator.clipboard.writeText(shareUrl);
 
     setCopiedId(id);
@@ -54,7 +56,23 @@ export default function LandingPage() {
       thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
     };
 
-    setRecordings([newRecording, ...recordings]);
+    setRecordings((prev) => [newRecording, ...prev]);
+    setActiveVideoId(newId);
+  };
+
+  const handleUploadFinished = (newId: string) => {
+    setIsUploadOpen(false);
+
+    const newRecording: RecordingItem = {
+      id: newId,
+      title: `Uploaded Stream ${newId.slice(-6)}`,
+      duration: '00:00',
+      createdAt: 'Just now',
+      views: 1,
+      thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+    };
+
+    setRecordings((prev) => [newRecording, ...prev]);
     setActiveVideoId(newId);
   };
 
@@ -208,7 +226,7 @@ export default function LandingPage() {
           </section>
         )}
 
-        {/* MY RECORDINGS LIBRARY */}
+        {/* PUBLIC LIBRARY */}
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="font-outfit font-bold text-xl text-white flex items-center space-x-2">
@@ -319,8 +337,7 @@ export default function LandingPage() {
 
             <UploadZone 
               onUploadSuccess={(id) => {
-                setIsUploadOpen(false);
-                setActiveVideoId(id);
+                handleUploadFinished(id);
               }}
             />
           </div>
