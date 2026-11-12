@@ -49,7 +49,7 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	videoId := uuid.New().String()
-	rawFilePath := filepath.Join("./storage/raw", fmt.Sprintf("%s.mp4", videoId))
+	rawFilePath := filepath.Join("./tmp/raw", fmt.Sprintf("%s.mp4", videoId))
 
 	// stream file bytes to disk
 	if err := StreamFileToDisk(file, rawFilePath); err != nil {
@@ -75,7 +75,7 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("HIT")
 
 	// create output directory
-	outputDir := fmt.Sprintf("storage/processed/%s", videoId)
+	outputDir := fmt.Sprintf("tmp/processed/%s", videoId)
 
 	// publish job to queue
 	payload := transcode.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }

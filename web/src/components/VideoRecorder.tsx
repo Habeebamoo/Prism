@@ -12,6 +12,8 @@ import {
   Check, 
   Sparkles, 
   X,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 interface VideoRecorderProps {
@@ -24,39 +26,58 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const uploadQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const chunkIndexRef = useRef<number>(0);
+  const streamFailedRef = useRef<boolean>(false);
+
   const [isRecording, setIsRecording] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [chunksUploaded, setChunksUploaded] = useState(0);
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [recordedVideoId, setRecordedVideoId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [visibilit, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL!).replace(/\/$/, '');
+  const siteBase = (process.env.NEXT_PUBLIC_BASE_URL!).replace(/\/$/, '');
 
   useEffect(() => {
+    let active = true;
+
     async function setupCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 },
           audio: true,
         });
+        if (!active) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         if (videoPreviewRef.current) {
           videoPreviewRef.current.srcObject = stream;
         }
       } catch (err) {
         console.error('Failed to access camera/mic:', err);
+        setError('Camera or microphone permission denied. Please allow access and retry.');
       }
     }
 
     setupCamera();
 
     return () => {
+      active = false;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
-
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -68,30 +89,92 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     return () => clearInterval(interval);
   }, [isRecording]);
 
+  const getSupportedMimeType = () => {
+    const candidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ];
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  };
 
   const startRecording = () => {
     if (!streamRef.current) return;
 
-    // Generate Instant Video ID
-    const newVideoId = `v_${crypto.randomUUID().slice(0, 8)}`;
-    setRecordedVideoId(newVideoId);
+    const newVideoId = crypto.randomUUID();
+    chunkIndexRef.current = 0;
+    uploadQueueRef.current = Promise.resolve();
+    streamFailedRef.current = false;
 
-    const chunks: Blob[] = [];
-    const recorder = new MediaRecorder(streamRef.current, {
-      mimeType: 'video/webm;codecs=vp9,opus',
-    });
+    setError(null);
+    setChunksUploaded(0);
+    setRecordingTime(0);
+
+    const mimeType = getSupportedMimeType();
+    const recorder = mimeType
+      ? new MediaRecorder(streamRef.current, { mimeType })
+      : new MediaRecorder(streamRef.current);
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunks.push(e.data);
-        // HERE: Stream chunk e.data directly to backend API endpoint
-        // e.g., fetch(`/api/v1/videos/${newVideoId}/chunk`, { method: 'POST', body: e.data })
+      if (e.data.size > 0 && !streamFailedRef.current) {
+        const seq = chunkIndexRef.current++;
+        const chunkBlob = e.data;
+
+        uploadQueueRef.current = uploadQueueRef.current
+          .then(async () => {
+            if (streamFailedRef.current) return;
+
+            const res = await fetch(`${apiBase}/api/v1/ingest/stream/${newVideoId}?seq=${seq}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/octet-stream' },
+              body: chunkBlob,
+            });
+
+            if (!res.ok) {
+              streamFailedRef.current = true;
+              const msg = await res.text();
+              throw new Error(msg || `Chunk ${seq} rejected (${res.status})`);
+            }
+
+            setChunksUploaded((prev) => prev + 1);
+          })
+          .catch((err: Error) => {
+            setError(`Live stream interrupted: ${err.message}`);
+          });
       }
     };
 
-    recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      console.log('Recording stopped, blob size:', blob.size);
+    recorder.onstop = async () => {
+      setIsFinalizing(true);
+      try {
+        // Wait for the final queued chunk to finish writing to FFmpeg stdin
+        await uploadQueueRef.current;
+
+        if (streamFailedRef.current) {
+          setIsFinalizing(false);
+          return;
+        }
+
+        const finishRes = await fetch(`${apiBase}/api/v1/ingest/stream/${newVideoId}/finish`, {
+          method: 'POST',
+        });
+
+        if (!finishRes.ok) {
+          const msg = await finishRes.text();
+          throw new Error(msg || `Failed to finalize stream (${finishRes.status})`);
+        }
+
+        setRecordedVideoId(newVideoId);
+
+        const shareUrl = `${siteBase}/v/${newVideoId}`;
+        navigator.clipboard?.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 3000);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to finalize recording.');
+      } finally {
+        setIsFinalizing(false);
+      }
     };
 
     recorder.start(1000);
@@ -103,13 +186,6 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-
-      if (recordedVideoId) {
-        const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/v/${recordedVideoId}`;
-        navigator.clipboard.writeText(shareUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 3000);
-      }
     }
   };
 
@@ -141,7 +217,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const shareUrl = recordedVideoId ? `${process.env.NEXT_PUBLIC_BASE_URL}/v/${recordedVideoId}` : '';
+  const shareUrl = recordedVideoId ? `${siteBase}/v/${recordedVideoId}` : '';
 
   return (
     <div className="fixed inset-0 z-50 bg-dark/90 backdrop-blur-md flex items-center justify-center p-4 font-jsans">
@@ -158,7 +234,8 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+            disabled={isFinalizing}
+            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
@@ -174,16 +251,30 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
             className="w-full h-full object-cover transform -scale-x-100"
           />
 
-          {/* RECORDING TIMER OVERLAY */}
+          {/* RECORDING TIMER & LIVE CHUNK COUNTER */}
           {isRecording && (
-            <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-dark/80 backdrop-blur-md border border-pink/40 text-pink text-xs font-mono font-bold flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-pink animate-pulse" />
-              <span>REC {formatTime(recordingTime)}</span>
+            <div className="absolute top-4 inset-x-4 flex items-center justify-between">
+              <div className="px-3 py-1.5 rounded-full bg-dark/80 backdrop-blur-md border border-pink/40 text-pink text-xs font-mono font-bold flex items-center space-x-2">
+                <span className="w-2 h-2 rounded-full bg-pink animate-pulse" />
+                <span>REC {formatTime(recordingTime)}</span>
+              </div>
+
+              <div className="px-3 py-1.5 rounded-full bg-dark/80 backdrop-blur-md border border-orange/30 text-orange text-[11px] font-mono">
+                {chunksUploaded}s streamed
+              </div>
+            </div>
+          )}
+
+          {/* FINALIZING STREAM OVERLAY */}
+          {isFinalizing && (
+            <div className="absolute inset-0 bg-dark/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-3">
+              <Loader2 className="w-9 h-9 text-pink animate-spin" />
+              <p className="font-outfit font-bold text-sm text-white">Finalizing HLS Stream...</p>
             </div>
           )}
 
           {/* AUDIO/VIDEO CONTROLS FLOAT */}
-          {!recordedVideoId && (
+          {!recordedVideoId && !isFinalizing && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-3 px-4 py-2 rounded-full bg-dark/80 backdrop-blur-md border border-zinc-800">
               <button
                 onClick={toggleMic}
@@ -204,13 +295,21 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
         {/* FOOTER ACTIONS */}
         <div className="p-5 bg-dark space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-pink/10 border border-pink/30 flex items-center space-x-2 text-pink text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
           {!recordedVideoId ? (
             /* RECORD TRIGGER BUTTONS */
             <div className="flex items-center justify-center">
               {!isRecording ? (
                 <button
                   onClick={startRecording}
-                  className="px-8 py-3.5 bg-pink hover:opacity-90 text-white font-outfit font-bold text-base rounded-full shadow-[0_0_25px_rgba(255,51,181,0.5)] transition-all flex items-center space-x-2 transform hover:scale-105"
+                  disabled={isFinalizing}
+                  className="px-8 py-3.5 bg-pink hover:opacity-90 text-white font-outfit font-bold text-base rounded-full shadow-[0_0_25px_rgba(255,51,181,0.5)] transition-all flex items-center space-x-2 transform hover:scale-105 disabled:opacity-50"
                 >
                   <Video className="w-5 h-5" />
                   <span>Start Recording</span>
@@ -269,6 +368,6 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
       </div>
     </div>
   );
-}
+};
 
 export default VideoRecorder;

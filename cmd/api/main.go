@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -43,10 +44,33 @@ func main() {
 	ingestHandler := ingest.NewIngestHandler(cfg, producer)
 	streamHandler := stream.NewStreamHandler(cfg, storageClient)
 
+	streamMngr := ingest.NewStreamManager("./tmp/live", func(videoId, hlsDir string) {
+		remotePrefix := fmt.Sprintf("videos/%s", videoId)
+		outputDir := fmt.Sprintf("./tmp/live/%s", videoId)
+
+		log.Println("[LIVE STREAM] Uploading assets to B2")
+
+		uploadCtx, uploadCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uploadCancel()
+
+		if err := storageClient.UploadDirectory(uploadCtx, outputDir, remotePrefix); err != nil {
+			log.Printf("[LIVE STREAM] B2 upload failed for video: %s | err: %v\n", videoId, err)
+			return
+		}
+
+		log.Printf("[LIVE STREAM] B2 upload finished for video %s\n", videoId)
+
+		// clean up local disk
+		os.RemoveAll(outputDir)
+		log.Println("[LIVE STREAM] Cleaned up local workspace")
+	})
 
 	// routes
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
+	mux.HandleFunc("POST /api/v1/ingest/stream/{id}", streamMngr.HandleStreamChunk)
+	mux.HandleFunc("POST /api/v1/ingest/stream/{id}/finish", streamMngr.HandleStreamFinish)
 	mux.HandleFunc("GET /api/v1/stream/{videoId}/{filepath...}", streamHandler.ServeHTTP)
 
 	handler := middlewares.CORS(mux)

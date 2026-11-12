@@ -112,10 +112,15 @@ func (c *Consumer) Start(ctx context.Context) {
 						log.Printf("[WorkerPool] B2 upload finished for video %s\n", payload.VideoId)
 
 						// clean up local disk
-						log.Println("[WorkerPool] Cleaning up local workspace...")
+						if err := os.RemoveAll(payload.OutputDir); err != nil {
+							log.Printf("[cleanup] failed to remove output dir %q: %v", payload.OutputDir, err)
+						}
 
-						os.RemoveAll(payload.OutputDir)
-						os.RemoveAll(payload.RawPath)
+						if err := os.Remove(payload.RawPath); err != nil {
+							log.Printf("[cleanup] failed to remove raw file %q: %v", payload.RawPath, err)
+						}
+
+						log.Println("[WorkerPool] Cleaned up local workspace")
 
 						// ack job
 						ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
