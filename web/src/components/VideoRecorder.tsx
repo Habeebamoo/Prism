@@ -10,15 +10,13 @@ import {
   CameraOff, 
   Copy, 
   Check, 
-  Globe, 
-  Lock, 
   Sparkles, 
   X,
 } from 'lucide-react';
 
 interface VideoRecorderProps {
   onClose: () => void;
-  onRecordingComplete: (videoId: string, visibility: 'PUBLIC' | 'PRIVATE') => void;
+  onRecordingComplete: (videoId: string) => void;
 }
 
 const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => {
@@ -32,9 +30,8 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [recordedVideoId, setRecordedVideoId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [visibilit, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
 
-  // 1. Initialize Camera & Microphone Stream
   useEffect(() => {
     async function setupCamera() {
       try {
@@ -54,14 +51,13 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     setupCamera();
 
     return () => {
-      // Cleanup tracks when unmounting
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
 
-  // 2. Recording Timer
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isRecording) {
@@ -72,7 +68,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  // 3. Start Recording
+
   const startRecording = () => {
     if (!streamRef.current) return;
 
@@ -94,26 +90,22 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     };
 
     recorder.onstop = () => {
-      // Finalize video blob
       const blob = new Blob(chunks, { type: 'video/webm' });
       console.log('Recording stopped, blob size:', blob.size);
     };
 
-    // Collect 1-second chunks for low-latency streaming
     recorder.start(1000);
     mediaRecorderRef.current = recorder;
     setIsRecording(true);
   };
 
-  // 4. Stop Recording & Trigger Instant Sharing
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
 
-      // Instantly copy link to user's clipboard
       if (recordedVideoId) {
-        const shareUrl = `${window.location.origin}/v/${recordedVideoId}`;
+        const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/v/${recordedVideoId}`;
         navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 3000);
@@ -124,6 +116,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
   const toggleMic = () => {
     if (streamRef.current) {
       const audioTrack = streamRef.current.getAudioTracks()[0];
+
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setMicEnabled(audioTrack.enabled);
@@ -134,6 +127,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
   const toggleCamera = () => {
     if (streamRef.current) {
       const videoTrack = streamRef.current.getVideoTracks()[0];
+
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setCameraEnabled(videoTrack.enabled);
@@ -147,7 +141,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const shareUrl = recordedVideoId ? `${window.location.origin}/v/${recordedVideoId}` : '';
+  const shareUrl = recordedVideoId ? `${process.env.NEXT_PUBLIC_BASE_URL}/v/${recordedVideoId}` : '';
 
   return (
     <div className="fixed inset-0 z-50 bg-dark/90 backdrop-blur-md flex items-center justify-center p-4 font-jsans">
@@ -263,40 +257,8 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
                 </button>
               </div>
 
-              {/* PRIVACY TOGGLE SWITCH */}
-              <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
-                <div>
-                  <p className="text-xs font-bold text-white">Sharing Permission</p>
-                  <p className="text-[11px] font-jsans-small text-zinc-400">
-                    {visibility === 'PUBLIC' ? 'Visible on your Instagram-style feed' : 'Only people with the link can view'}
-                  </p>
-                </div>
-
-                <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-                  <button
-                    onClick={() => setVisibility('PUBLIC')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition-colors ${
-                      visibility === 'PUBLIC' ? 'bg-orange text-dark' : 'text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <Globe className="w-3.5 h-3.5" />
-                    <span>Public</span>
-                  </button>
-
-                  <button
-                    onClick={() => setVisibility('PRIVATE')}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition-colors ${
-                      visibility === 'PRIVATE' ? 'bg-pink text-white' : 'text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Private</span>
-                  </button>
-                </div>
-              </div>
-
               <button
-                onClick={() => onRecordingComplete(recordedVideoId, visibility)}
+                onClick={() => onRecordingComplete(recordedVideoId)}
                 className="w-full py-2.5 bg-orange hover:opacity-90 text-dark font-outfit font-bold text-sm rounded-xl transition-all"
               >
                 Done & Save to Library
