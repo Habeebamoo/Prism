@@ -11,8 +11,10 @@ import (
 
 type Config struct {
 	Port               string
+	Env                string
 	MaxUploadSize      int64
 	RedisUrl           string
+	PostgresUrl        string
 	StreamName         string
 	WorkerGroupName    string
 	SemaphoreSize      int64
@@ -22,6 +24,7 @@ type Config struct {
 	B2SecretAccessKey  string
 	B2BucketName       string
 	B2Region           string
+	JWTSecret          string
 }
 
 var Envs []string
@@ -33,8 +36,10 @@ func Load() *Config {
 	}
 
 	port               :=  "PORT"
+	env                :=  "ENV"
 	maxUploadSizeStr   :=  "MAX_UPLOAD_SIZE_BYTES"
 	redisUrl           :=  "REDIS_URL"
+	postresUrl         :=  "POSTGRES_URL"
 	streamName         :=  "STREAM_NAME"
 	workerGroupName    :=  "WORKER_GROUP_NAME"
 	semaphoreSizeStr   :=  "SEMAPHORE_SIZE"
@@ -43,11 +48,14 @@ func Load() *Config {
 	b2SecretAccessKey  :=  "B2_SECRET_ACCESS_KEY"
 	b2BucketName       :=  "B2_BUCKET_NAME"
 	b2Region           :=  "B2_REGION"
+	jwtSecret          :=  "JWT_SECRET"
 
 	// validate env variables
-	Envs =  append(Envs, 
+	Envs =  append(Envs,
+		env, 
 		maxUploadSizeStr, 
 		redisUrl, 
+		postresUrl,
 		streamName, 
 		workerGroupName, 
 		port,
@@ -57,6 +65,7 @@ func Load() *Config {
 		b2SecretAccessKey,
 		b2BucketName,
 		b2Region,
+		jwtSecret,
 	)
 	for _, env := range Envs {
 		if err := Check(env); err != nil {
@@ -71,8 +80,10 @@ func Load() *Config {
 
 	return &Config{
 		Port:               os.Getenv(port),
+		Env:                os.Getenv(env),
 		MaxUploadSize:      maxUploadSize,
 		RedisUrl:           os.Getenv(redisUrl),
+		PostgresUrl:        os.Getenv(postresUrl),
 		StreamName:         os.Getenv(streamName),
 		WorkerGroupName:    os.Getenv(workerGroupName),
 		SemaphoreSize:      semaphorSize,
@@ -81,6 +92,7 @@ func Load() *Config {
 		B2SecretAccessKey:  os.Getenv(b2SecretAccessKey),
 		B2BucketName:       os.Getenv(b2BucketName),
 		B2Region:           os.Getenv(b2Region),
+		JWTSecret:          os.Getenv(jwtSecret),
 	}
 }
 

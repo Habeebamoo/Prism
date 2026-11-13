@@ -1,0 +1,168 @@
+package handlers
+
+import (
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+	"uuid"
+
+	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/middlewares"
+	"github.com/Habeebamoo/Prism/internal/models"
+	"github.com/Habeebamoo/Prism/pkg/utils"
+)
+
+type AuthHandler struct {
+	cfg   *configs.Config
+	DB    *sql.DB
+	otps  sync.Map
+}
+
+type otpEntry struct {
+	Code       string
+	ExpiresAt  time.Time
+}
+
+func NewAuthHandler(cfg *configs.Config, DB *sql.DB) *AuthHandler {
+	return &AuthHandler{cfg: cfg, DB: DB}
+}
+
+func (a *AuthHandler) HandleRequestOTP(w http.ResponseWriter, r *http.Request) {
+	var req models.OTPReq;
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: "Invalid JSON Payload" })
+		return
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if !strings.Contains(email, "@") || len(email) < 5 {
+		utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: "Invalid Email Address" })
+		return
+	}
+
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Failed to generate OTP" })
+		return
+	}
+	code := fmt.Sprintf("%06d", n.Int64())
+
+	a.otps.Store(email, otpEntry{
+		Code: code,
+		ExpiresAt: time.Now().Add(5*time.Minute),
+	})
+
+	// if err := sendOTPEmail(email, code); err != nil {
+	// 	log.Printf("[AUTH] email delivery error for %s: %v", email, err)
+	// 	utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Failed to send verification code" })
+	// 	return
+	// }
+
+	utils.JsonResponse(w, 200, utils.Payload{ Success: true, Message: "OTP Sent." })
+}
+
+func (a *AuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
+	var req models.OTPRes
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: "Invalid JSON Payload" })
+		return
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	code := strings.TrimSpace(req.Code)
+
+	raw, ok := a.otps.Load(email)
+	if !ok {
+		utils.JsonResponse(w, 401, utils.Payload{ Success: false, Message: "Invalid or Expired OTP" })
+		return
+	}
+
+	entry := raw.(otpEntry)
+	if time.Now().After(entry.ExpiresAt) || entry.Code != code {
+		utils.JsonResponse(w, 401, utils.Payload{ Success: false, Message: "Invalid or Expired Code" })
+		return
+	}
+	a.otps.Delete(email)
+
+	var userID string
+
+	err := a.DB.QueryRowContext(
+		r.Context(),
+		`SELECT id FROM users WHERE email = $1`,
+		email,
+	).Scan(&userID)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		userID = uuid.New().String()
+
+		_, err = a.DB.ExecContext(
+			r.Context(),
+			`INSERT INTO users (id, email) VALUES ($1, $2)`,
+			userID,
+			email,
+		)
+
+		if err != nil {
+			utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Account Creation Failed" })
+			return
+		}
+	} else if err != nil {
+		utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Internal Server Error" })
+		return
+	}
+
+	token, err := utils.SignJWT(a.cfg, userID)
+	if err != nil {
+		http.Error(w, "token error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "prism_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+		Secure:   a.cfg.Env == "production",
+		MaxAge:   7 * 24 * 3600,
+	})
+
+	utils.JsonResponse(w, 200, utils.Payload{ Success: true, Message: "Authentication Successfull" })
+}
+
+func (a *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "prism_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+
+	utils.JsonResponse(w, 200, utils.Payload{ Success: false, Message: "Logged out successfully" })
+}
+
+func (a *AuthHandler) HandleGetMe(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middlewares.UserIDFromContext(r.Context())
+
+	var user any
+
+	a.DB.QueryRowContext(
+		r.Context(),
+		`SELECT id, email
+		FROM users WHERE id = $1`,
+		userID,
+	).Scan(&user)
+
+	utils.JsonResponse(w, 200, utils.Payload{ Success: true, Data: user })
+}

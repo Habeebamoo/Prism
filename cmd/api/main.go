@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/database"
+	"github.com/Habeebamoo/Prism/internal/handlers"
 	"github.com/Habeebamoo/Prism/internal/ingest"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
@@ -30,6 +32,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// init postgres
+	postgresDB := database.Init(cfg)
+
 	// init message broker
 	producer := queue.NewProducer(cfg, rdb)
 
@@ -43,6 +48,7 @@ func main() {
 	// init handlers
 	ingestHandler := ingest.NewIngestHandler(cfg, producer)
 	streamHandler := stream.NewStreamHandler(cfg, storageClient)
+	authHandler   := handlers.NewAuthHandler(cfg, postgresDB)
 
 	streamMngr := ingest.NewStreamManager("./tmp/live", func(videoId, hlsDir string) {
 		remotePrefix := fmt.Sprintf("videos/%s", videoId)
@@ -67,6 +73,12 @@ func main() {
 
 	// routes
 	mux := http.NewServeMux()
+	authMiddleware := middlewares.RequireAuth(cfg)
+
+	mux.HandleFunc("POST /api/v1/auth/request-otp", authHandler.HandleRequestOTP)
+	mux.HandleFunc("POST /api/v1/auth/verify-otp", authHandler.HandleVerifyOTP)
+	mux.Handle("POST /api/v1/auth/logout", authMiddleware(http.HandlerFunc(authHandler.HandleLogout)))
+	mux.Handle("GET /api/v1/auth/me", authMiddleware(http.HandlerFunc(authHandler.HandleGetMe)))
 
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
 	mux.HandleFunc("POST /api/v1/ingest/stream/{id}", streamMngr.HandleStreamChunk)
