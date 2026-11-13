@@ -25,6 +25,7 @@ type Config struct {
 	B2BucketName       string
 	B2Region           string
 	JWTSecret          string
+	ResendAPIKey       string
 }
 
 var Envs []string
@@ -49,6 +50,7 @@ func Load() *Config {
 	b2BucketName       :=  "B2_BUCKET_NAME"
 	b2Region           :=  "B2_REGION"
 	jwtSecret          :=  "JWT_SECRET"
+	resendApiKey       :=  "RESEND_API_KEY"
 
 	// validate env variables
 	Envs =  append(Envs,
@@ -66,6 +68,7 @@ func Load() *Config {
 		b2BucketName,
 		b2Region,
 		jwtSecret,
+		resendApiKey,
 	)
 	for _, env := range Envs {
 		if err := Check(env); err != nil {
@@ -93,6 +96,7 @@ func Load() *Config {
 		B2BucketName:       os.Getenv(b2BucketName),
 		B2Region:           os.Getenv(b2Region),
 		JWTSecret:          os.Getenv(jwtSecret),
+		ResendAPIKey:       os.Getenv(resendApiKey),
 	}
 }
 

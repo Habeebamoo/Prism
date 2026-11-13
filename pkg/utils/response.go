@@ -7,7 +7,7 @@ import (
 
 type Payload struct {
 	Success  bool         `json:"success"`
-	Message  string       `json:"message"`
+	Message  string       `json:"message,omitempty"`
 	Data     interface{}  `json:"data,omitempty"`
 }
 

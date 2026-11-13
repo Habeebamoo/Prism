@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/Habeebamoo/Prism/internal/configs"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/models"
+	"github.com/Habeebamoo/Prism/internal/services"
 	"github.com/Habeebamoo/Prism/pkg/utils"
 )
 
@@ -60,11 +62,11 @@ func (a *AuthHandler) HandleRequestOTP(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: time.Now().Add(5*time.Minute),
 	})
 
-	// if err := sendOTPEmail(email, code); err != nil {
-	// 	log.Printf("[AUTH] email delivery error for %s: %v", email, err)
-	// 	utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Failed to send verification code" })
-	// 	return
-	// }
+	if err := services.SendOTPEmail(r.Context(), a.cfg, email, code); err != nil {
+		log.Printf("[AUTH] email delivery error for %s: %v", email, err)
+		utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Failed to send verification code" })
+		return
+	}
 
 	utils.JsonResponse(w, 200, utils.Payload{ Success: true, Message: "OTP Sent." })
 }
@@ -116,6 +118,7 @@ func (a *AuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if err != nil {
+		log.Println(err)
 		utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Internal Server Error" })
 		return
 	}
@@ -153,16 +156,40 @@ func (a *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *AuthHandler) HandleGetMe(w http.ResponseWriter, r *http.Request) {
-	userID, _ := middlewares.UserIDFromContext(r.Context())
+	userID, ok := middlewares.UserIDFromContext(r.Context())
+	if !ok {
+		utils.JsonResponse(w, http.StatusUnauthorized, utils.Payload{
+			Success: false,
+			Message: "Unauthorized",
+		})
+		return
+	}
 
-	var user any
-
-	a.DB.QueryRowContext(
+	var user models.User
+	err := a.DB.QueryRowContext(
 		r.Context(),
-		`SELECT id, email
-		FROM users WHERE id = $1`,
+		`SELECT id, email, created_at
+		 FROM users WHERE id = $1`,
 		userID,
-	).Scan(&user)
+	).Scan(&user.Id, &user.Email, &user.CreatedAt)
 
-	utils.JsonResponse(w, 200, utils.Payload{ Success: true, Data: user })
+	if errors.Is(err, sql.ErrNoRows) {
+		utils.JsonResponse(w, http.StatusNotFound, utils.Payload{
+			Success: false,
+			Message: "User not found",
+		})
+		return
+	}
+	if err != nil {
+		utils.JsonResponse(w, http.StatusInternalServerError, utils.Payload{
+			Success: false,
+			Message: "Failed to fetch user",
+		})
+		return
+	}
+
+	utils.JsonResponse(w, http.StatusOK, utils.Payload{
+		Success: true,
+		Data:    user,
+	})
 }
