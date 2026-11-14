@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type B2Client struct {
@@ -97,5 +99,49 @@ func (b *B2Client) GetObject(ctx context.Context, key string) (*s3.GetObjectOutp
 		Bucket: aws.String(b.bucket),
 		Key: aws.String(key),
 	})
+}
+
+func (b *B2Client) DeleteVideoFolder(ctx context.Context, videoId string) error {
+	cleanId := strings.TrimSpace(videoId)
+	if cleanId == "" || cleanId == "." || cleanId == "/" {
+		return fmt.Errorf("refusing to delete empty or root prefix")
+	}
+
+	prefix := fmt.Sprintf("videos/%s/", cleanId)
+	paginator := s3.NewListObjectsV2Paginator(b.client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(b.bucket),
+		Prefix: aws.String(prefix),
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("list b2 objects for %s: %w", prefix, err)
+		}
+
+		if len(page.Contents) == 0 {
+			continue
+		}
+
+		objects := make([]types.ObjectIdentifier, 0, len(page.Contents))
+		for _, obj := range page.Contents {
+			objects = append(objects, types.ObjectIdentifier{
+				Key: obj.Key,
+			})
+		}
+
+		_, err = b.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(b.bucket),
+			Delete: &types.Delete{
+				Objects: objects,
+				Quiet: aws.Bool(true),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("batch delete b2 objects for %s: %w", prefix, err)
+		}
+	}
+
+	return nil
 }
 

@@ -28,7 +28,7 @@ interface UserVideo {
   created_at: string;
 }
 
-export default function MeLibraryPage() {
+const page = () => {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -53,6 +53,7 @@ export default function MeLibraryPage() {
       const res = await fetch(`${apiBase}/api/v1/me/videos`, {
         credentials: 'include',
       });
+
       if (res.ok) {
         const data = await res.json();
         setVideos(data);
@@ -69,6 +70,7 @@ export default function MeLibraryPage() {
         const res = await fetch(`${apiBase}/api/v1/auth/me`, {
           credentials: 'include',
         });
+
         if (res.ok) {
           const userData = await res.json();
           setUser(userData);
@@ -86,6 +88,7 @@ export default function MeLibraryPage() {
       method: 'POST',
       credentials: 'include',
     });
+
     setUser(null);
     setVideos([]);
     setActiveVideoId(null);
@@ -107,6 +110,7 @@ export default function MeLibraryPage() {
     }
 
     setDeletingId(id);
+
     try {
       const res = await fetch(`${apiBase}/api/v1/videos/${id}`, {
         method: 'DELETE',
@@ -267,7 +271,7 @@ export default function MeLibraryPage() {
               ) : (
                 /* VIDEO CARDS GRID */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {videos.map((video) => (
+                  {videos.length > 0 && videos.map((video) => (
                     <div
                       key={video.id}
                       onClick={() => setActiveVideoId(video.id)}
@@ -367,3 +371,5 @@ export default function MeLibraryPage() {
     </div>
   );
 }
+
+export default page;

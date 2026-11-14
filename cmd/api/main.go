@@ -49,6 +49,7 @@ func main() {
 	ingestHandler := ingest.NewIngestHandler(cfg, producer)
 	streamHandler := stream.NewStreamHandler(cfg, storageClient)
 	authHandler   := handlers.NewAuthHandler(cfg, postgresDB)
+	videoHandler  := handlers.NewVideoHandler(cfg, postgresDB, storageClient)
 
 	streamMngr := ingest.NewStreamManager("./tmp/live", func(videoId, hlsDir string) {
 		remotePrefix := fmt.Sprintf("videos/%s", videoId)
@@ -79,6 +80,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/verify-otp", authHandler.HandleVerifyOTP)
 	mux.Handle("POST /api/v1/auth/logout", authMiddleware(http.HandlerFunc(authHandler.HandleLogout)))
 	mux.Handle("GET /api/v1/auth/me", authMiddleware(http.HandlerFunc(authHandler.HandleGetMe)))
+
+	mux.Handle("GET /api/v1/me/videos", authMiddleware(http.HandlerFunc(videoHandler.HandleListMyVideos)))
+	mux.Handle("DELETE /api/v1/videos/{id}", authMiddleware(http.HandlerFunc(videoHandler.HandleDeleteVideo)))
 
 	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
 	mux.HandleFunc("POST /api/v1/ingest/stream/{id}", streamMngr.HandleStreamChunk)
