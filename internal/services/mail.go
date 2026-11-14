@@ -24,7 +24,7 @@ func SendOTPEmail(ctx context.Context, cfg *configs.Config, toEmail, otp string)
 		return fmt.Errorf("RESEND_API_KEY is not configured")
 	}
 
-	from := "hello@myclivo.com"
+	from := "prism@myclivo.com"
 
 	payload := resendEmailRequest{
 		From:    from,

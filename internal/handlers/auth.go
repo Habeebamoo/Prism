@@ -129,14 +129,22 @@ func (a *AuthHandler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var sameSite http.SameSite
+
+	if a.cfg.Env == "production" {
+		sameSite = http.SameSiteNoneMode
+	} else {
+		sameSite = http.SameSiteLaxMode
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "prism_token",
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSite,
 		Secure:   a.cfg.Env == "production",
-		MaxAge:   7 * 24 * 3600,
+		MaxAge:   7 * 24 * 60 * 60 * 1000,
 	})
 
 	utils.JsonResponse(w, 200, utils.Payload{ Success: true, Message: "Authentication Successfull" })
