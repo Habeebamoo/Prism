@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/handlers"
 	"github.com/Habeebamoo/Prism/internal/storage"
 	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/redis/go-redis/v9"
@@ -22,15 +23,17 @@ type Consumer struct {
 	wg          sync.WaitGroup
 	transcoder  *transcode.Transcoder
 	storage     *storage.B2Client
+	vHandler    *handlers.VideoHandler
 }
 
-func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder, storage *storage.B2Client) *Consumer {
+func NewConsumer(cfg *configs.Config, client *redis.Client, transcoder *transcode.Transcoder, storage *storage.B2Client, vHandler *handlers.VideoHandler) *Consumer {
 	return &Consumer{
 		cfg: cfg, 
 		client: client, 
 		sem: make(chan struct{}, cfg.SemaphoreSize),
 		transcoder: transcoder,
 		storage: storage,
+		vHandler: vHandler,
 	}
 }
 
@@ -130,6 +133,8 @@ func (c *Consumer) Start(ctx context.Context) {
 							log.Println("[WorkerPool] Failed to ack job")
 							return
 						}
+
+						_ = c.vHandler.UpdateVideoStatus(payload.VideoId, "READY")
 					}(msg)
 				}
 			}

@@ -39,6 +39,23 @@ func RequireAuth(cfg *configs.Config) func(http.Handler) http.Handler {
 	}
 }
 
+func OptionalAuth(cfg *configs.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie("prism_token")
+
+			if err == nil && cookie.Value != "" {
+				if claims, err := utils.ParseJWT(cfg, cookie.Value); err == nil {
+					ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+					r = r.WithContext(ctx)
+				}
+			}
+			
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(UserIDKey).(string)
 	return userID, ok && userID != ""

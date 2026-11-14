@@ -46,10 +46,10 @@ func main() {
 	}
 
 	// init handlers
-	ingestHandler := ingest.NewIngestHandler(cfg, producer)
-	streamHandler := stream.NewStreamHandler(cfg, storageClient)
 	authHandler   := handlers.NewAuthHandler(cfg, postgresDB)
 	videoHandler  := handlers.NewVideoHandler(cfg, postgresDB, storageClient)
+	ingestHandler := ingest.NewIngestHandler(cfg, producer, videoHandler)
+	streamHandler := stream.NewStreamHandler(cfg, storageClient)
 
 	streamMngr := ingest.NewStreamManager("./tmp/live", func(videoId, hlsDir string) {
 		remotePrefix := fmt.Sprintf("videos/%s", videoId)
@@ -74,7 +74,9 @@ func main() {
 
 	// routes
 	mux := http.NewServeMux()
+
 	authMiddleware := middlewares.RequireAuth(cfg)
+	optionalAuth   := middlewares.OptionalAuth(cfg)
 
 	mux.HandleFunc("POST /api/v1/auth/request-otp", authHandler.HandleRequestOTP)
 	mux.HandleFunc("POST /api/v1/auth/verify-otp", authHandler.HandleVerifyOTP)
@@ -84,7 +86,7 @@ func main() {
 	mux.Handle("GET /api/v1/me/videos", authMiddleware(http.HandlerFunc(videoHandler.HandleListMyVideos)))
 	mux.Handle("DELETE /api/v1/videos/{id}", authMiddleware(http.HandlerFunc(videoHandler.HandleDeleteVideo)))
 
-	mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
+	mux.Handle("POST /api/v1/ingest", optionalAuth(http.HandlerFunc(ingestHandler.Ingest)))
 	mux.HandleFunc("POST /api/v1/ingest/stream/{id}", streamMngr.HandleStreamChunk)
 	mux.HandleFunc("POST /api/v1/ingest/stream/{id}/finish", streamMngr.HandleStreamFinish)
 	mux.HandleFunc("GET /api/v1/stream/{videoId}/{filepath...}", streamHandler.ServeHTTP)

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/handlers"
+	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
 	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/Habeebamoo/Prism/pkg/utils"
@@ -17,13 +19,16 @@ import (
 type IngestHandler struct {
 	cfg       *configs.Config
   producer  *queue.Producer
+	vHandler  *handlers.VideoHandler
 }
 
-func NewIngestHandler(cfg *configs.Config, producer *queue.Producer) *IngestHandler {
-	return &IngestHandler{cfg, producer}
+func NewIngestHandler(cfg *configs.Config, producer *queue.Producer, vHandler *handlers.VideoHandler) *IngestHandler {
+	return &IngestHandler{cfg, producer, vHandler}
 }
 
 func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
+	userId, userExists := middlewares.UserIDFromContext(r.Context())
+
 	// limit file size
 	r.Body = http.MaxBytesReader(w, r.Body, i.cfg.MaxUploadSize)
 	file, _, err := r.FormFile("video")
@@ -89,6 +94,24 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 			Message: err.Error(),
 		})
 		return
+	}
+
+	// Persist metadata in PostgreSQL
+	if userExists {
+		record := handlers.VideoRecord{
+			VideoId: videoId,
+			UserId: userId,
+			Title: "any",
+			Status: "PROCESSING",
+		}
+
+		if err := i.vHandler.CreateVideoRecord(r.Context(), record); err != nil {
+			utils.JsonResponse(w, http.StatusInternalServerError, utils.Payload{
+				Success: false,
+				Message: "Failed to save video metadata",
+			})
+			return
+		}
 	}
 
 	utils.JsonResponse(w, 200, utils.Payload{

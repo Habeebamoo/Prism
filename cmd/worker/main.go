@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
+	"github.com/Habeebamoo/Prism/internal/database"
+	"github.com/Habeebamoo/Prism/internal/handlers"
 	"github.com/Habeebamoo/Prism/internal/queue"
 	"github.com/Habeebamoo/Prism/internal/storage"
 	"github.com/Habeebamoo/Prism/internal/transcode"
@@ -29,6 +31,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// init postgres
+	postgresDB := database.Init(cfg)
+
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -39,9 +44,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// init videoHandler
+	videoHandler := handlers.NewVideoHandler(cfg, postgresDB, storage)
+
 	// init transcoder workerpool
 	transcoder := transcode.NewTranscoder()
-	consumer := worker.NewConsumer(cfg, rdb, transcoder, storage)
+	consumer := worker.NewConsumer(cfg, rdb, transcoder, storage, videoHandler)
 
 	go consumer.Start(sigCtx)
 

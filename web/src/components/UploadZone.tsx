@@ -79,6 +79,7 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
       const apiUrl = `${baseUrl}/api/v1/ingest`;
 
       xhr.open('POST', apiUrl);
+      xhr.withCredentials = true;
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

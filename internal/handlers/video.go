@@ -20,8 +20,50 @@ type VideoHandler struct {
 	B2   *storage.B2Client
 }
 
+type VideoRecord struct {
+	VideoId  string
+	UserId   string
+	Title    string
+	Status   string
+}
+
 func NewVideoHandler(cfg *configs.Config, db *sql.DB, B2 *storage.B2Client) *VideoHandler {
 	return &VideoHandler{ cfg: cfg, DB: db, B2: B2 }
+}
+
+func (v *VideoHandler) CreateVideoRecord(ctx context.Context, record VideoRecord) error {
+	nullableUserID := sql.NullString{
+		String: record.UserId,
+		Valid:  record.UserId != "",
+	}
+
+	_, err := v.DB.ExecContext(
+		ctx,
+		`INSERT INTO videos (id, user_id, title, status)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (id) DO UPDATE
+		 SET user_id = COALESCE(videos.user_id, EXCLUDED.user_id),
+		     status = EXCLUDED.status`,
+		record.VideoId,
+		nullableUserID,
+		record.Title,
+		record.Status,
+	)
+
+	return err
+}
+
+func (v *VideoHandler) UpdateVideoStatus(videoID, status string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := v.DB.ExecContext(
+		ctx,
+		`UPDATE videos SET status = $1 WHERE id = $2`,
+		status,
+		videoID,
+	)
+	return err
 }
 
 func (v *VideoHandler) HandleListMyVideos(w http.ResponseWriter, r *http.Request) {
