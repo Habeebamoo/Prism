@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import HlsPlayer from '@/src/components/HlsPlayer';
 import VideoRecorder from '@/src/components/VideoRecorder';
 import UploadZone from '@/src/components/UploadZone';
@@ -13,9 +13,11 @@ import {
   Sparkles, 
   Film,
   X,
-  Share2
+  Share2,
+  Link
 } from 'lucide-react';
 import { RecordingItem, SAMPLE_RECORDINGS } from '@/src/data/video';
+import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
   const [recordings, setRecordings] = useState<RecordingItem[]>(SAMPLE_RECORDINGS);
@@ -23,12 +25,43 @@ export default function LandingPage() {
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const router = useRouter();
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const streamBase = (process.env.NEXT_PUBLIC_STREAM_URL!).replace(/\/$/, '');
   const siteBase = (process.env.NEXT_PUBLIC_BASE_URL!).replace(/\/$/, '');
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL!).replace(/\/$/, '');
 
   const activeStreamUrl = activeVideoId ? `${streamBase}/${activeVideoId}/master.m3u8` : '';
   const activeShareUrl = activeVideoId ? `${siteBase}/v/${activeVideoId}` : '';
+
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const res = await fetch(`${apiBase}/api/v1/auth/me`, {
+          credentials: 'include',
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          setUser(json.data ?? json);
+        }
+      } finally {
+        setAuthChecked(true);
+      }
+    }
+    checkSession();
+  }, [apiBase]);
+
+  const requireSignIn = (onAllowed: () => void) => {
+    if (!authChecked) return;
+    if (!user) {
+      router.push('/signin');
+      return;
+    }
+    onAllowed();
+  };
 
   const copyLink = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -74,8 +107,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-dark text-zinc-100 font-jsans selection:bg-pink selection:text-white">
-      
-      {/* INSTAGRAM-INSPIRED SLEEK HEADER */}
+
       <header className="sticky top-0 z-40 bg-dark/85 backdrop-blur-md border-b border-zinc-800/80 px-6 md:px-12 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveVideoId(null)}>
           <div className="p-0.5 rounded-full bg-linear-to-tr from-orange via-pink to-pink">
@@ -91,7 +123,7 @@ export default function LandingPage() {
         {/* HEADER ACTIONS */}
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => setIsUploadOpen(true)}
+            onClick={() => requireSignIn(() => setIsUploadOpen(true))}
             className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white font-jsans font-semibold text-xs rounded-full border border-zinc-800 transition-colors flex items-center space-x-2"
           >
             <Upload className="w-3.5 h-3.5 text-orange" />
@@ -100,7 +132,7 @@ export default function LandingPage() {
 
           {/* PRIMARY PINK CTA */}
           <button
-            onClick={() => setIsRecorderOpen(true)}
+            onClick={() => requireSignIn(() => setIsRecorderOpen(true))}
             className="px-5 py-2 bg-pink hover:opacity-95 text-white font-outfit font-bold text-xs rounded-full shadow-[0_0_20px_rgba(255,51,181,0.45)] transition-all flex items-center space-x-2 transform hover:scale-105 active:scale-95"
           >
             <Video className="w-4 h-4 stroke-[2.5]" />
@@ -132,7 +164,7 @@ export default function LandingPage() {
 
             <div className="flex items-center justify-center space-x-4 pt-2">
               <button
-                onClick={() => setIsRecorderOpen(true)}
+                onClick={() => requireSignIn(() => setIsRecorderOpen(true))}
                 className="px-6 py-3 bg-pink hover:opacity-95 text-white font-outfit font-bold text-sm rounded-full shadow-[0_0_25px_rgba(255,51,181,0.5)] transition-all flex items-center space-x-2 transform hover:scale-105"
               >
                 <Video className="w-4 h-4" />
@@ -140,7 +172,7 @@ export default function LandingPage() {
               </button>
 
               <button
-                onClick={() => setIsUploadOpen(true)}
+                onClick={() => requireSignIn(() => setIsUploadOpen(true))}
                 className="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-outfit font-bold text-sm rounded-full border border-zinc-800 transition-all flex items-center space-x-2"
               >
                 <Upload className="w-4 h-4 text-orange" />

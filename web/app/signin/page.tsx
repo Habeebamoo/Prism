@@ -24,6 +24,8 @@ const Page = ({ onAuthenticated }: OtpAuthFormProps) => {
     setError(null);
     setLoading(true);
 
+    let data;
+
     try {
       const res = await fetch(`${apiBase}/api/v1/auth/request-otp`, {
         method: 'POST',
@@ -32,7 +34,8 @@ const Page = ({ onAuthenticated }: OtpAuthFormProps) => {
       });
 
       if (!res.ok) {
-        throw new Error((await res.text()) || 'Failed to send OTP');
+        data = await res.json()
+        throw new Error(data.message || 'Failed to send OTP');
       }
 
       setStep('otp');
@@ -48,6 +51,8 @@ const Page = ({ onAuthenticated }: OtpAuthFormProps) => {
     setError(null);
     setLoading(true);
 
+    let data;
+
     try {
       const res = await fetch(`${apiBase}/api/v1/auth/verify-otp`, {
         method: 'POST',
@@ -57,10 +62,11 @@ const Page = ({ onAuthenticated }: OtpAuthFormProps) => {
       });
 
       if (!res.ok) {
-        throw new Error((await res.text()) || 'Invalid verification code');
+        data = await res.json()
+        throw new Error(data.message || 'Invalid verification code');
       }
 
-      const data = await res.json();
+      data = await res.json();
       onAuthenticated?.(data.data ?? data);
       router.push('/me');
     } catch (err) {

@@ -25,6 +25,7 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
+  const [title, setTitle] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -63,13 +64,19 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
 
   const handleStartUpload = async () => {
     if (!selectedFile) return;
+    if (!title.trim) {
+      setUploadError("Please enter a title")
+      return
+    }
 
     setUploadState('uploading');
     setProgress(0);
     setUploadError(null);
 
     const formData = new FormData();
+
     formData.append('video', selectedFile);
+    formData.append('title', title.trim())
 
     try {
       const xhr = new XMLHttpRequest();
@@ -97,6 +104,7 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
             if (generatedId) {
               setVideoId(generatedId);
               setUploadState('success');
+              setTitle('')
               onUploadSuccess(generatedId);
             } else {
               setUploadError('Server responded, but videoId was missing.');
@@ -168,6 +176,23 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
 
   return (
     <div className="space-y-4 font-jsans">
+      <div className="space-y-1.5 text-left">
+        <label htmlFor="video-title" className="block text-xs font-semibold text-zinc-300">
+          Video Title <span className="text-pink">*</span>
+        </label>
+        <input
+          id="video-title"
+          type="text"
+          required
+          maxLength={120}
+          disabled={uploadState === "uploading"}
+          placeholder="Enter a title for your video"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full bg-dark border border-zinc-800 focus:border-orange rounded-2xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
+        />
+      </div>
+
       {/* 1. IDLE STATE: DROPZONE */}
       {uploadState === 'idle' && (
         <div
@@ -268,7 +293,8 @@ const UploadZone = ({ onUploadSuccess }: UploadZoneProps) => {
 
               <button
                 onClick={handleStartUpload}
-                className="w-full sm:w-auto px-7 py-2.5 bg-pink hover:opacity-95 text-white font-outfit font-bold text-xs rounded-full shadow-[0_0_20px_rgba(255,51,181,0.45)] transition-all flex items-center justify-center space-x-2 transform hover:scale-105 active:scale-95"
+                disabled={!title.trim()}
+                className="w-full sm:w-auto px-7 py-2.5 bg-pink hover:opacity-95 text-white font-outfit font-bold text-xs rounded-full shadow-[0_0_20px_rgba(255,51,181,0.45)] transition-all flex items-center justify-center space-x-2 transform hover:scale-105 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none disabled:hover:scale-100 disabled:active:scale-100 disabled:hover:opacity-100 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
                 <span>Send Video</span>

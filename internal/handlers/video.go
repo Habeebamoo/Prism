@@ -32,11 +32,6 @@ func NewVideoHandler(cfg *configs.Config, db *sql.DB, B2 *storage.B2Client) *Vid
 }
 
 func (v *VideoHandler) CreateVideoRecord(ctx context.Context, record VideoRecord) error {
-	nullableUserID := sql.NullString{
-		String: record.UserId,
-		Valid:  record.UserId != "",
-	}
-
 	_, err := v.DB.ExecContext(
 		ctx,
 		`INSERT INTO videos (id, user_id, title, status)
@@ -45,7 +40,7 @@ func (v *VideoHandler) CreateVideoRecord(ctx context.Context, record VideoRecord
 		 SET user_id = COALESCE(videos.user_id, EXCLUDED.user_id),
 		     status = EXCLUDED.status`,
 		record.VideoId,
-		nullableUserID,
+		record.UserId,
 		record.Title,
 		record.Status,
 	)
@@ -71,7 +66,7 @@ func (v *VideoHandler) HandleListMyVideos(w http.ResponseWriter, r *http.Request
 
 	rows, err := v.DB.QueryContext(
 		r.Context(),
-		`SELECT id, status, title, created_at
+		`SELECT id, user_id, status, title, created_at
 		 FROM videos
 		 WHERE user_id = $1
 		 ORDER BY created_at DESC`,
@@ -87,7 +82,7 @@ func (v *VideoHandler) HandleListMyVideos(w http.ResponseWriter, r *http.Request
 
 	for rows.Next() {
 		var v models.Video
-		if err := rows.Scan(&v.Id, &v.Status, &v.Title, &v.CreatedAt); err != nil {
+		if err := rows.Scan(&v.Id, &v.UserId, &v.Status, &v.Title, &v.CreatedAt); err != nil {
 			utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Failed to scan videos" })
 			return
 		}

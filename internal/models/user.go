@@ -7,9 +7,9 @@ import (
 )
 
 type User struct {
-	Id         uuid.UUID
-	Email      string
-	CreatedAt  time.Time
+	Id         uuid.UUID  `json:"id"`
+	Email      string     `json:"email"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 type OTPReq struct { 

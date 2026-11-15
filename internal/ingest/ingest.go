@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
 	"github.com/Habeebamoo/Prism/internal/handlers"
@@ -27,7 +28,14 @@ func NewIngestHandler(cfg *configs.Config, producer *queue.Producer, vHandler *h
 }
 
 func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
-	userId, userExists := middlewares.UserIDFromContext(r.Context())
+	userId, _ := middlewares.UserIDFromContext(r.Context())
+
+	// metadata check
+	title := strings.TrimSpace(r.FormValue("title"))
+	if title == "" {
+		utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: "Missing Title" })
+		return
+	}
 
 	// limit file size
 	r.Body = http.MaxBytesReader(w, r.Body, i.cfg.MaxUploadSize)
@@ -97,21 +105,19 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Persist metadata in PostgreSQL
-	if userExists {
-		record := handlers.VideoRecord{
-			VideoId: videoId,
-			UserId: userId,
-			Title: "any",
-			Status: "PROCESSING",
-		}
+	record := handlers.VideoRecord{
+		VideoId: videoId,
+		UserId: userId,
+		Title: title,
+		Status: "PROCESSING",
+	}
 
-		if err := i.vHandler.CreateVideoRecord(r.Context(), record); err != nil {
-			utils.JsonResponse(w, http.StatusInternalServerError, utils.Payload{
-				Success: false,
-				Message: "Failed to save video metadata",
-			})
-			return
-		}
+	if err := i.vHandler.CreateVideoRecord(r.Context(), record); err != nil {
+		utils.JsonResponse(w, http.StatusInternalServerError, utils.Payload{
+			Success: false,
+			Message: "Failed to save video metadata",
+		})
+		return
 	}
 
 	utils.JsonResponse(w, 200, utils.Payload{

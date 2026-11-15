@@ -23,6 +23,7 @@ import {
 
 interface UserVideo {
   id: string;
+  user_id: string;
   title: string;
   status: string;
   created_at: string;
@@ -55,8 +56,8 @@ const page = () => {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setVideos(data);
+        const json = await res.json();
+        setVideos(Array.isArray(json) ? json : json.data ?? []);
       }
     } finally {
       setLoadingVideos(false);
@@ -72,8 +73,8 @@ const page = () => {
         });
 
         if (res.ok) {
-          const userData = await res.json();
-          setUser(userData);
+          const json = await res.json();
+          setUser(json.data ?? json);
           await fetchMyVideos();
         }
       } finally {
