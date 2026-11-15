@@ -51,7 +51,7 @@ func main() {
 	ingestHandler := ingest.NewIngestHandler(cfg, producer, videoHandler)
 	streamHandler := stream.NewStreamHandler(cfg, storageClient)
 
-	streamMngr := ingest.NewStreamManager("./tmp/live", func(videoId, hlsDir string) {
+	streamMngr := ingest.NewStreamManager("./tmp/live", videoHandler, func(videoId, hlsDir string) {
 		remotePrefix := fmt.Sprintf("videos/%s", videoId)
 		outputDir := fmt.Sprintf("./tmp/live/%s", videoId)
 

@@ -12,9 +12,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/Habeebamoo/Prism/internal/handlers"
+	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/pkg/utils"
 )
 
@@ -34,13 +37,15 @@ type StreamManager struct {
 	baseTempDir    string
 	sessions       map[string]*StreamSession
 	mu             sync.RWMutex
+	vHandler       *handlers.VideoHandler
 	onComplete     func (videoId string, hlsDir string)
 }
 
-func NewStreamManager(baseTempDir string, onComplete func(videoId string, hlsDir string)) *StreamManager {
+func NewStreamManager(baseTempDir string, vH *handlers.VideoHandler, onComplete func(videoId string, hlsDir string)) *StreamManager {
 	sm := &StreamManager{
 		baseTempDir:  baseTempDir,
 		sessions:     make(map[string]*StreamSession),
+		vHandler:     vH,
 		onComplete:   onComplete,
 	}
 
@@ -118,6 +123,8 @@ func (sm *StreamManager) getOrCreateSession(videoId string, seq int) (*StreamSes
 }
 
 func (sm *StreamManager) HandleStreamChunk(w http.ResponseWriter, r *http.Request) {
+	userId, _ := middlewares.UserIDFromContext(r.Context())
+
 	videoId := r.PathValue("id")
 	if videoId == "" {
 		utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: "Missing Video Id" })
@@ -134,6 +141,27 @@ func (sm *StreamManager) HandleStreamChunk(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: err.Error()} )
 		return
+	}
+
+	if seq == 0 {
+		title := strings.TrimSpace(r.URL.Query().Get("title"))
+		if title == "" {
+			utils.JsonResponse(w, 400, utils.Payload{ Success: false, Message: "Video title is required" })
+			return
+		}
+
+		record := handlers.VideoRecord{
+			VideoId: videoId,
+			UserId: userId,
+			Title: title,
+			Status: "PROCESSING",
+		}
+
+		err := sm.vHandler.CreateVideoRecord(r.Context(), record)
+		if err != nil {
+			utils.JsonResponse(w, 500, utils.Payload{ Success: false, Message: "Failed to create video record" })
+			return
+		}
 	}
 
 	session.mu.Lock()
@@ -201,6 +229,8 @@ func (sm *StreamManager) HandleStreamFinish(w http.ResponseWriter, r *http.Reque
 	if sm.onComplete != nil {
 		go sm.onComplete(videoID, session.OutputDir)
 	}
+
+	_ = sm.vHandler.UpdateVideoStatus(videoID, "READY")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

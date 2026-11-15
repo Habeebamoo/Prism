@@ -34,6 +34,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [chunksUploaded, setChunksUploaded] = useState(0);
+  const [title, setTitle] = useState('');
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [recordedVideoId, setRecordedVideoId] = useState<string | null>(null);
@@ -52,10 +53,12 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
           video: { width: 1280, height: 720 },
           audio: true,
         });
+
         if (!active) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
+
         streamRef.current = stream;
         if (videoPreviewRef.current) {
           videoPreviewRef.current.srcObject = stream;
@@ -70,9 +73,11 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
     return () => {
       active = false;
+
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
+
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -81,11 +86,13 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
+
     if (isRecording) {
       interval = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     }
+
     return () => clearInterval(interval);
   }, [isRecording]);
 
@@ -100,6 +107,10 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
   const startRecording = () => {
     if (!streamRef.current) return;
+    if (!title.trim) {
+      setError("Please enter a title before recording");
+      return
+    }
 
     const newVideoId = crypto.randomUUID();
     chunkIndexRef.current = 0;
@@ -124,16 +135,17 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
           .then(async () => {
             if (streamFailedRef.current) return;
 
-            const res = await fetch(`${apiBase}/api/v1/ingest/stream/${newVideoId}?seq=${seq}`, {
+            const res = await fetch(`${apiBase}/api/v1/ingest/stream/${newVideoId}?seq=${seq}&title=${title}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/octet-stream' },
+              credentials: "include",
               body: chunkBlob,
             });
 
             if (!res.ok) {
               streamFailedRef.current = true;
-              const msg = await res.text();
-              throw new Error(msg || `Chunk ${seq} rejected (${res.status})`);
+              const msg = await res.json();
+              throw new Error(msg.message || `Chunk ${seq} rejected (${res.status})`);
             }
 
             setChunksUploaded((prev) => prev + 1);
@@ -146,6 +158,7 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
     recorder.onstop = async () => {
       setIsFinalizing(true);
+
       try {
         // Wait for the final queued chunk to finish writing to FFmpeg stdin
         await uploadQueueRef.current;
@@ -157,11 +170,12 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
 
         const finishRes = await fetch(`${apiBase}/api/v1/ingest/stream/${newVideoId}/finish`, {
           method: 'POST',
+          credentials: "include"
         });
 
         if (!finishRes.ok) {
-          const msg = await finishRes.text();
-          throw new Error(msg || `Failed to finalize stream (${finishRes.status})`);
+          const msg = await finishRes.json();
+          throw new Error(msg.message || `Failed to finalize stream (${finishRes.status})`);
         }
 
         setRecordedVideoId(newVideoId);
@@ -302,13 +316,32 @@ const VideoRecorder = ({ onClose, onRecordingComplete }: VideoRecorderProps) => 
             </div>
           )}
 
+          {!recordedVideoId && 
+            <div className="space-y-1.5 text-left">
+              <label htmlFor="recording-title" className="block text-xs font-semibold text-zinc-300">
+                Recording Title <span className="text-pink">*</span>
+              </label>
+              <input
+                id="recording-title"
+                type="text"
+                required
+                maxLength={120}
+                disabled={isRecording}
+                placeholder="e.g., Bug Reproduction #42"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-dark border border-zinc-800 focus:border-orange rounded-2xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none disabled:opacity-50"
+              />
+            </div>
+          }
+
           {!recordedVideoId ? (
             /* RECORD TRIGGER BUTTONS */
             <div className="flex items-center justify-center">
               {!isRecording ? (
                 <button
                   onClick={startRecording}
-                  disabled={isFinalizing}
+                  disabled={isFinalizing || !title.trim()}
                   className="px-8 py-3.5 bg-pink hover:opacity-90 text-white font-outfit font-bold text-base rounded-full shadow-[0_0_25px_rgba(255,51,181,0.5)] transition-all flex items-center space-x-2 transform hover:scale-105 disabled:opacity-50"
                 >
                   <Video className="w-5 h-5" />
