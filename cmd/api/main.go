@@ -18,6 +18,7 @@ import (
 	"github.com/Habeebamoo/Prism/internal/queue"
 	"github.com/Habeebamoo/Prism/internal/storage"
 	"github.com/Habeebamoo/Prism/internal/stream"
+	"github.com/Habeebamoo/Prism/pkg/utils"
 )
 
 func main() {
@@ -75,6 +76,10 @@ func main() {
 	// routes
 	mux := http.NewServeMux()
 	authMiddleware := middlewares.RequireAuth(cfg)
+
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		utils.JsonResponse(w, 200, utils.Payload{ Success: true, Message: "System is live!!!" })
+	})
 
 	mux.HandleFunc("POST /api/v1/auth/request-otp", authHandler.HandleRequestOTP)
 	mux.HandleFunc("POST /api/v1/auth/verify-otp", authHandler.HandleVerifyOTP)
