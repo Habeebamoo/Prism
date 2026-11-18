@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import HlsPlayer from '@/src/components/HlsPlayer';
@@ -18,7 +18,7 @@ import {
   Info
 } from 'lucide-react';
 
-export default function WatchPage() {
+const WatchPage = () => {
   const params = useParams();
   const router = useRouter();
   const rawId = params?.id;
@@ -200,3 +200,13 @@ export default function WatchPage() {
     </div>
   );
 }
+
+const page = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <WatchPage />
+    </Suspense>
+  )
+}
+
+export default page;
