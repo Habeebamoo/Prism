@@ -279,12 +279,24 @@ const page = () => {
                       className="group bg-zinc-900/60 border border-zinc-800/80 hover:border-orange/50 rounded-3xl overflow-hidden cursor-pointer transition-all hover:shadow-[0_0_25px_rgba(249,115,22,0.15)] flex flex-col justify-between"
                     >
                       {/* PREVIEW BANNER */}
-                      <div className="relative aspect-video bg-linear-to-br from-zinc-900 via-dark to-zinc-950 flex items-center justify-center border-b border-zinc-800/60">
-                        <div className="w-12 h-12 rounded-full bg-pink/90 text-white flex items-center justify-center shadow-[0_0_20px_rgba(255,51,181,0.6)] group-hover:scale-110 transition-transform">
+                      <div className="relative aspect-video bg-linear-to-br from-zinc-900 via-dark to-zinc-950 flex items-center justify-center border-b border-zinc-800/60 overflow-hidden">
+                        {video.status === 'READY' && (
+                          <img
+                            src={`${streamBase}/${video.id}/thumbnail.jpg`}
+                            alt={video.title}
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        )}
+
+                        <div className="relative z-10 w-12 h-12 rounded-full bg-pink/90 text-white flex items-center justify-center shadow-[0_0_20px_rgba(255,51,181,0.6)] group-hover:scale-110 transition-transform">
                           <Play className="w-5 h-5 fill-white ml-0.5" />
                         </div>
 
-                        <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-dark/80 border border-zinc-800 text-[10px] font-mono text-orange">
+                        <span className="absolute top-3 left-3 z-10 px-2.5 py-0.5 rounded-full bg-dark/80 backdrop-blur-xs border border-zinc-800 text-[10px] font-mono text-orange">
                           {video.status}
                         </span>
                       </div>
@@ -332,8 +344,8 @@ const page = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
               )}
             </section>
           </>
