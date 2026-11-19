@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,4 +123,34 @@ func ProbeVideo(filePath string) (*VideoMetadata, error) {
 		Duration: duration,
 		Codec: stream.CodecName,
 	}, nil
+}
+
+func GenerateThumbnail(ctx context.Context, rawPath, outputDir string) error {
+	run := func (seek string) error {
+		cmd := exec.CommandContext(
+			ctx,
+			"ffmpeg",
+			"-y",
+			"-ss", seek,
+			"-i", rawPath,
+			"-vframes", "1",
+			"-vf", "scale=1280:-2",
+			"-q:v", "3",
+			outputDir,
+		)
+
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("ffmpeg thumbnail (%s): %w | %s", seek, err, string(out))
+		}
+		if info, err := os.Stat(outputDir); err != nil || info.Size() == 0 {
+			return fmt.Errorf("thumbnail file not created at %s", seek)
+		}
+		return nil
+	}
+
+	if err := run("00:00:01"); err != nil {
+		return run("00:00:00")
+	}
+
+	return nil
 }

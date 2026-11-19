@@ -1,17 +1,20 @@
 package ingest
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Habeebamoo/Prism/internal/configs"
 	"github.com/Habeebamoo/Prism/internal/handlers"
 	"github.com/Habeebamoo/Prism/internal/middlewares"
 	"github.com/Habeebamoo/Prism/internal/queue"
+
 	"github.com/Habeebamoo/Prism/internal/transcode"
 	"github.com/Habeebamoo/Prism/pkg/utils"
 	"github.com/google/uuid"
@@ -90,8 +93,23 @@ func (i *IngestHandler) Ingest(w http.ResponseWriter, r *http.Request) {
 	// create output directory
 	outputDir := fmt.Sprintf("tmp/processed/%s", videoId)
 
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		log.Fatal("[WorkerPool] Failed to create directory")
+		return
+	}
+
 	// publish job to queue
 	payload := transcode.TranscodeJob{ VideoId: videoId, RawPath: rawFilePath, OutputDir: outputDir }
+
+	// Generate thumbnail
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	thumbnailPath := filepath.Join(outputDir, "thumbnail.jpg")
+
+	if err := GenerateThumbnail(ctx, rawFilePath, thumbnailPath); err != nil {
+		log.Printf("[INGEST] Thumbnail skipped for video %s\n", videoId)
+	}
 
 	err = i.producer.Publish(payload)
 	if err != nil {

@@ -69,6 +69,7 @@ func main() {
 	mux.Handle("DELETE /api/v1/videos/{id}", authMiddleware(http.HandlerFunc(videoHandler.HandleDeleteVideo)))
 
 	mux.Handle("POST /api/v1/ingest", authMiddleware(http.HandlerFunc(ingestHandler.Ingest)))
+	//mux.HandleFunc("POST /api/v1/ingest", ingestHandler.Ingest)
 	mux.Handle("POST /api/v1/ingest/stream/{id}", authMiddleware(http.HandlerFunc(streamMngr.HandleStreamChunk)))
 	mux.Handle("POST /api/v1/ingest/stream/{id}/finish", authMiddleware(http.HandlerFunc(streamMngr.HandleStreamFinish)))
 	mux.HandleFunc("GET /api/v1/stream/{videoId}/{filepath...}", streamHandler.ServeHTTP)

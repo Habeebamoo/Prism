@@ -25,3 +25,19 @@ func Init(cfg *configs.Config) *sql.DB {
 
 	return db
 }
+
+func InitTest(url string) *sql.DB {
+	db, err := sql.Open("postgres", url)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+
+	return db
+}
