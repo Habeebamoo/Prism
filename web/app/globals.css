@@ -1,24 +1,25 @@
+
 @import "tailwindcss";
 
 @font-face {
   font-family: "inter";
   src: url("../src/fonts/Inter_18pt-Medium.ttf");
-};
+}
 
 @font-face {
   font-family: "outfit";
   src: url("../src/fonts/Outfit-Regular.ttf");
-};
+}
 
 @font-face {
   font-family: "jsans";
   src: url("../src/fonts/PlusJakartaSans-Medium.ttf");
-};
+}
 
 @font-face {
   font-family: "jsans-small";
   src: url("../src/fonts/PlusJakartaSans-Light.ttf");
-};
+}
 
 @theme {
   --color-dark: #09090B;
@@ -28,4 +29,4 @@
   --font-outfit: "outfit";
   --font-jsans: "jsans";
   --font-jsans-small: "jsans-small";
-};
+}

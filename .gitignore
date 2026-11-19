@@ -1,6 +1,4 @@
 index.html
-cmd/api/main-test
-internal/ingest/sync.go
 tmp/
 .env
 api
