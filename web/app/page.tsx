@@ -73,36 +73,12 @@ export default function LandingPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleRecordingFinished = (newId: string) => {
+  const handleRecordingFinished = () => {
     setIsRecorderOpen(false);
-
-    const newRecording: RecordingItem = {
-      id: newId,
-      title: `Instant Stream ${newId.slice(-6)}`,
-      duration: '00:00',
-      createdAt: 'Just now',
-      views: 1,
-      thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
-    };
-
-    setRecordings((prev) => [newRecording, ...prev]);
-    setActiveVideoId(newId);
   };
 
-  const handleUploadFinished = (newId: string) => {
+  const handleUploadFinished = () => {
     setIsUploadOpen(false);
-
-    const newRecording: RecordingItem = {
-      id: newId,
-      title: `Uploaded Stream ${newId.slice(-6)}`,
-      duration: '00:00',
-      createdAt: 'Just now',
-      views: 1,
-      thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
-    };
-
-    setRecordings((prev) => [newRecording, ...prev]);
-    setActiveVideoId(newId);
   };
 
   return (
@@ -291,7 +267,7 @@ export default function LandingPage() {
 
             <UploadZone 
               onUploadSuccess={(id) => {
-                handleUploadFinished(id);
+                handleUploadFinished();
               }}
             />
           </div>
