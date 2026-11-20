@@ -14,7 +14,6 @@ import {
   Film,
   X,
   Share2,
-  Link
 } from 'lucide-react';
 import { RecordingItem, SAMPLE_RECORDINGS } from '@/src/data/video';
 import { useRouter } from 'next/navigation';
