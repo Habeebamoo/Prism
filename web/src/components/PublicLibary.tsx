@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Clock, Eye, Link2, MoreVertical, Check } from 'lucide-react';
+import { Play, Clock, Link2, MoreVertical, Check } from 'lucide-react';
 import { RecordingItem } from '@/src/data/video';
 
 interface PublicLibraryProps {
@@ -76,10 +76,6 @@ export default function PublicLibrary({
                   <span className="flex items-center space-x-1">
                     <Clock className="w-3.5 h-3.5 text-zinc-500" />
                     <span>{video.createdAt}</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <Eye className="w-3.5 h-3.5 text-zinc-500" />
-                    <span>{video.views}</span>
                   </span>
                 </div>
 
