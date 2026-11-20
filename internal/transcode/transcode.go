@@ -22,9 +22,9 @@ func NewTranscoder() *Transcoder {
 }
 
 func (t *Transcoder) Transcode(ctx context.Context, job TranscodeJob) error {
-	// create directory
-	if os.MkdirAll(job.OutputDir, 0755) != nil {
-		return fmt.Errorf("[WorkerPool] Failed to create directory")
+	// Create directory
+	if err := os.MkdirAll(job.OutputDir, 0755); err != nil {
+		return fmt.Errorf("[WorkerPool] Failed to create directory: %w", err)
 	}
 
 	hasAudio := HasAudioTrack(ctx, job.RawPath)
@@ -33,62 +33,58 @@ func (t *Transcoder) Transcode(ctx context.Context, job TranscodeJob) error {
 	variantPlaylistPattern := filepath.Join(job.OutputDir, "%v", "index.m3u8")
 
 	args := []string{
-		 	"-i", job.RawPath, 
+		"-y",
+		"-nostats",
+		"-loglevel", "error",
+		"-threads", "1",
+		"-i", job.RawPath,
 
-			"-filter_complex",
-			"[0:v]split=3[v1][v2][v3]; "+
-				"[v1]scale=w=1920:h=1080:force_original_aspect_ratio=decrease:force_divisible_by=2[v1out]; "+
-				"[v2]scale=w=1280:h=720:force_original_aspect_ratio=decrease:force_divisible_by=2[v2out]; "+
-				"[v3]scale=w=854:h=480:force_original_aspect_ratio=decrease:force_divisible_by=2[v3out]",
-				
-			//  ---- 1080p
-			"-map", "[v1out]",
-			"-c:v:0", "libx264",
-			"-b:v:0", "5000k",
-			"-maxrate:v:0", "5250k",
-			"-bufsize:v:0", "7500k",
+		"-filter_complex",
+		"[0:v]split=2[v1][v2]; "+
+			"[v1]scale=w=1280:h=720:force_original_aspect_ratio=decrease:force_divisible_by=2[v1out]; "+
+			"[v2]scale=w=854:h=480:force_original_aspect_ratio=decrease:force_divisible_by=2[v2out]",
 
-			// ---- 720p
-			"-map", "[v2out]",
-			"-c:v:1", "libx264",
-			"-b:v:1", "2800k",
-			"-maxrate:v:1", "2996k",
-			"-bufsize:v:1", "4200k",
+		// ---- 720p
+		"-map", "[v1out]",
+		"-c:v:0", "libx264",
+		"-rc-lookahead", "5",
+		"-b:v:0", "2800k",
+		"-maxrate:v:0", "2996k",
+		"-bufsize:v:0", "4200k",
 
-			// ---- 480p
-			"-map", "[v3out]",
-			"-c:v:2", "libx264",
-			"-b:v:2", "1400k",
-			"-maxrate:v:2", "1498k",
-			"-bufsize:v:2", "2100k",
+		// ---- 480p
+		"-map", "[v2out]",
+		"-c:v:1", "libx264",
+		"-rc-lookahead", "5",
+		"-b:v:1", "1400k",
+		"-maxrate:v:1", "1498k",
+		"-bufsize:v:1", "2100k",
 	}
 
 	var streamMap string
 	if hasAudio {
-		 args = append(args, 
-						"-map", "a:0?", "-c:a:0", "aac", "-b:a:0", "192k",
-						"-map", "a:0?", "-c:a:1", "aac", "-b:a:1", "128k",
-						"-map", "a:0?", "-c:a:2", "aac", "-b:a:2", "96k",
+		args = append(args,
+			"-map", "a:0?", "-c:a:0", "aac", "-b:a:0", "128k",
+			"-map", "a:0?", "-c:a:1", "aac", "-b:a:1", "96k",
 		)
-
-		streamMap = "v:0,a:0,name:1080p v:1,a:1,name:720p v:2,a:2,name:480p"
+		streamMap = "v:0,a:0,name:720p v:1,a:1,name:480p"
 	} else {
-		streamMap = "v:0,name:1080p v:1,name:720p v:2,name:480p"
+		streamMap = "v:0,name:720p v:1,name:480p"
 	}
 
 	// HLS flags
-	args = append(args, 
-				"-preset", "veryfast",
-				"-g", "120",
-				"-sc_threshold", "0",
-				"-f", "hls",
-				"-hls_time", "4",
-				"-hls_playlist_type", "vod",
-				"-hls_flags", "independent_segments",
-				"-hls_segment_filename", segmentPattern,
-				"-master_pl_name", "master.m3u8",
-				"-var_stream_map", streamMap,
-				variantPlaylistPattern,
+	args = append(args,
+		"-preset", "superfast",
+		"-g", "120",
+		"-sc_threshold", "0",
+		"-f", "hls",
+		"-hls_time", "4",
+		"-hls_playlist_type", "vod",
+		"-hls_flags", "independent_segments",
+		"-hls_segment_filename", segmentPattern,
+		"-master_pl_name", "master.m3u8",
+		"-var_stream_map", streamMap,
+		variantPlaylistPattern,
 	)
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
@@ -100,7 +96,7 @@ func (t *Transcoder) Transcode(ctx context.Context, job TranscodeJob) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("[WorkerPool] ffmpeg failed: %v", string(output))
+		return fmt.Errorf("[WorkerPool] ffmpeg failed (%w): %s", err, string(output))
 	}
 
 	return nil
